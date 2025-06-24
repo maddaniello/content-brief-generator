@@ -1100,5 +1100,14 @@ def main():
             cluster_count = len(keyword_analysis.get('topic_clusters', {}))
             st.metric("🎯 Topic cluster", cluster_count)
 
+        # Footer
+    st.markdown("---")
+    st.markdown("""
+    <div style='text-align: center; color: #666;'>
+        <p>🔗 URL Migration Mapper | Sviluppato per ottimizzare le migrazioni SEO</p>
+        <p>💡 <strong>Funzionalità principali:</strong> Matching intelligente, Colonne personalizzabili, AI Enhancement, Output completo</p>
+    </div>
+    """, unsafe_allow_html=True)
+
 if __name__ == "__main__":
     main()
