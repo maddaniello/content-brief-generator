@@ -632,7 +632,7 @@ ANALISI INTENTO DI RICERCA AVANZATA:
         internal_urls = "\n".join(data['sitemap_urls'][:30]) if data['sitemap_urls'] else data.get('manual_urls', 'Nessuna URL interna disponibile')
         
         prompt = f"""
-Sei un esperto SEO content strategist e data analyst specializzato in E-E-A-T. Devi creare un content brief ESTREMAMENTE DETTAGLIATO e ACTIONABLE basato su DATI SEO REALI e ANALISI AVANZATA dei competitor.
+Sei un esperto SEO content strategist e data analyst di alto livello, con una specializzazione nell'E-E-A-T (Expertise, Authoritativeness, Trustworthiness). Il tuo obiettivo è creare un content brief estremamente dettagliato e altamente actionable, utilizzando dati SEO reali e un'analisi approfondita dei competitor.
 
 INFORMAZIONI CLIENTE:
 - Brand: {data['brand']}
@@ -642,17 +642,15 @@ INFORMAZIONI CLIENTE:
 - Domande frequenti inserite: {data['faqs']}
 - Tone of voice: {', '.join(data['tone_of_voice'])}
 
-{semrush_info}
 
-{related_kw_by_intent}
-
-{topic_clusters_info}
-
-{serper_info}
-
-{intent_insights}
-
-{competitor_analysis}
+DATI STRATEGICI:
+Utilizza le seguenti informazioni per ottimizzare il brief:
+Informazioni SEMrush: {semrush_info}
+Keyword correlate per intent: {related_kw_by_intent}
+Cluster tematici: {topic_clusters_info}
+Analisi SERP: {serper_info}
+Approfondimenti sull’intento: {intent_insights}
+Analisi dei competitor: {competitor_analysis}
 
 ANALISI DETTAGLIATA COMPETITOR:
 {competitor_data}
@@ -663,19 +661,18 @@ URL INTERNE DISPONIBILI (per link interni):
 ISTRUZIONI SPECIFICHE:
 - Il brand "{data['brand']}" DEVE apparire nel meta title alla fine
 - Il brand "{data['brand']}" DEVE apparire nella meta description
-- Usa la capitalizzazione naturale italiana (prima lettera maiuscola il resto minuscolo)
+- Usa la capitalizzazione naturale italiana per tutte le intestazioni e i titoli. (prima lettera maiuscola il resto minuscolo, ad esempio 'Come Funziona il Mutuo INPS per Dipendenti Pubblici' NON va bene, andrebbe scritto così 'Come funziona il mutuo INPS per dipendenti pubblici')
 - Utilizza TUTTI i dati reali per creare suggerimenti specifici e actionable
 - Per ogni H2/H3 fornisci istruzioni DETTAGLIATE su cosa scrivere all'interno di quel paragrafo tramite degli elenchi puntati dettagliati
-- Sfrutta i gap dei competitor per opportunità uniche
-- Integra keyword correlate per intent specifici
-- Rispondi strategicamente alle PAA classificate per intent
+- Identifica e capitalizza sulle lacune lasciate dai competitor per creare opportunità uniche e distinguibili.
+- Integra keyword correlate basate sugli intent specifici identificati.
+- Fornisci risposte mirate alle PAA (People Also Ask) in base all'intento di ricerca.
 
 Genera un content brief che includa:
 
 1. **STRATEGIA SEO DATA-DRIVEN AVANZATA**
-   - Analisi intent basata su CPC ({keyword_analysis['semrush_data'].get('cpc', 0)}€) e competition ({keyword_analysis['semrush_data'].get('competition', 0)})
    - Strategia per fase user journey: {search_intent_insights['user_journey_stage']}
-   - Piano per battere featured snippet attuale (se presente)
+   - Definisci la strategia per ciascuna fase del percorso dell'utente e dettagli su come superare i featured snippet attuali.
    - Sfruttamento gap competitor identificati
 
 2. **META OTTIMIZZATI CON DATI REALI**
@@ -693,7 +690,7 @@ Genera un content brief che includa:
    - Cosa scrivere nei primi 2-3 paragrafi
    - Come incorporare keyword principale naturalmente
    - Hook basato su gap competitor identificati
-   - Lunghezza ottimale e elementi da includere
+   - Elementi da includere
    
    **SEZIONI H2 CON ISTRUZIONI DETTAGLIATE:**
    Per ogni H2 fornisci:
@@ -702,9 +699,8 @@ Genera un content brief che includa:
    - Keyword correlate specifiche da integrare (con volumi di ricerca)
    - PAA specifiche da rispondere in quella sezione
    - Esempi concreti da includere
-   - Lunghezza paragrafo consigliata
    - Elementi aggiuntivi (liste, tabelle, immagini)
-   - Link interni strategici con anchor text specifiche
+   - Link interni coerenti con il contenuto partendo dalla Sitemap del sito con anchor text specifiche
 
 4. **STRATEGIA PEOPLE ALSO ASK AVANZATA**
    Per ogni PAA da Google:
@@ -720,7 +716,7 @@ Genera un content brief che includa:
    - Long-tail opportunities ad alto volume
 
 6. **STRATEGIA LINK INTERNI DATA-DRIVEN**
-   - Link basati su keyword correlate e volumi
+   - Link del sito provenienti dalla sitemap basate su keyword correlate e volumi coerenti con il contenuto dell'articolo
    - Anchor text ottimizzate per topic cluster
    - Distribuzione strategica per massimizzare ranking
 
@@ -736,7 +732,7 @@ Genera un content brief che includa:
    - Elementi obbligatori per ogni sezione
    - KPI di successo previsti
 
-Crea un brief che permetta al copywriter di scrivere contenuto SUPERIORE ai competitor utilizzando ESCLUSIVAMENTE dati reali e analisi avanzate. Ogni suggerimento deve essere specifico, actionable e basato sui dati forniti.
+Questo content brief deve essere concepito in modo da permettere al copywriter di produrre contenuti chiaramente superiori rispetto alla concorrenza, utilizzando esclusivamente dati reali e analisi avanzate. Ogni suggerimento deve essere specifico, actionable e orientato ai dati forniti, garantendo così un approccio strategico e mirato alla creazione di contenuti di alta qualità.
 """
 
         try:
