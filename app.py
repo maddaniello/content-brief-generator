@@ -291,18 +291,16 @@ IMPORTANTE:
 Genera un content brief completo che includa:
 
 1. **ANALISI INTENTO DI RICERCA E OBIETTIVO**
-   - Analizza l'intento dietro le keyword principali
-   - Definisci l'obiettivo dell'articolo e target
-   - Strategia per battere i competitor
+   - Esamina e approfondisci l'intento delle keyword principali individuate, inclusi i motivi per cui le persone cercano queste informazioni.
+   - Definisci con precisione l'obiettivo dell'articolo e il pubblico target,
+   - Crea una strategia per battere i competitor in merito alle informazioni raccolte sui loro siti individuando cosa potrebbe essere fatto meglio e cosa manca.
 
 2. **LINEE GUIDA SEO E STILE**
-   - Come utilizzare le keyword (densità, posizionamento)
-   - Tone of voice e stile di scrittura specifico
-   - Lunghezza consigliata del contenuto (analizza competitor)
+   - Fornisci dettagli in merito alle modalità di utilizzo delle keyword, inclusi densità e posizionamento strategico all'interno del testo.
+   - Specifica in dettaglio il tone of voice e lo stile di scrittura richiesto, nonché la lunghezza ideale del contenuto, supportata da un'analisi approfondita dei competitor per garantire il massimo impatto.
 
 3. **META TITLE E DESCRIPTION**
-   - Meta title ottimizzato (50-60 caratteri) con brand alla fine
-   - Meta description ottimizzata (150-160 caratteri) con brand incluso
+   - Fornisci un meta title ottimizzato (50-60 caratteri) e una meta description (150-160 caratteri) che evidenzino il brand e incorporino le keyword strategiche.
    - Usa capitalizzazione naturale italiana
 
 4. **STRATEGIA E-E-A-T**
