@@ -37,7 +37,7 @@ st.markdown("""
         margin-top: 2rem;
     }
     .info-box {
-        background-color: #f8f9fa;
+        background-color: #262730;
         padding: 1rem;
         border-radius: 0.5rem;
         border-left: 4px solid #3498db;
@@ -58,7 +58,7 @@ st.markdown("""
         margin: 1rem 0;
     }
     .success-box {
-        background-color: #d4edda;
+        background-color: #262730;
         padding: 1rem;
         border-radius: 0.5rem;
         border-left: 4px solid #28a745;
