@@ -515,23 +515,23 @@ IMPORTANTE:
 - Considera le keyword correlate di SEMrush per arricchire il contenuto
 - Analizza il featured snippet esistente per superarlo
 
-Genera un content brief completo che includa:
+Genera un content brief completo e dettagliato per un articolo ottimizzato per SEO, seguendo i seguenti punti chiave:
 
-1. **ANALISI INTENTO DI RICERCA E OBIETTIVO BASATA SU DATI REALI**
-   - Analizza l'intento basandoti sui dati di volume SEMrush e le PAA di Google
-   - Definisci l'obiettivo considerando la competizione reale (CPC e competition score)
-   - Strategia per battere i competitor analizzando featured snippet e top 10
+1. **ANALISI DELL'INTENTO DI RICERCA E DEL GOAL STRATEGICO BASATA SU DATI DI MERCATO REALE**
+   - Esegui un'analisi approfondita dell'intento di ricerca, utilizzando i dati di volume di SEMrush e le domande frequenti (PAA) di Google come riferimento fondamentale.
+   - Definisci chiaramente l'obiettivo del contenuto, tenendo in considerazione parametri come il CPC e il competition score attuali nel mercato.
+   - Proponi una strategia dettagliata per superare i competitor analizzando i featured snippet e identificando i top 10 risultati, evidenziando le leve che possono fare la differenza.
 
 2. **LINEE GUIDA SEO E STILE CON KEYWORD DATA-DRIVEN**
-   - Utilizza keyword correlate di SEMrush per densità e posizionamento
-   - Incorpora naturalmente le ricerche correlate di Google
-   - Stile basato sui volumi di ricerca e competizione
-   - Lunghezza ottimale basata sull'analisi competitor
+   - Integra keyword correlate ottenute da SEMrush, ottimizzando la densità e il posizionamento per massimizzare l'efficacia SEO.
+   - Incorpora in modo naturale le ricerche correlate di Google all'interno del testo.
+   - Definisci lo stile di scrittura in base ai volumi di ricerca e alla competizione, assicurandoti che il contenuto sia accattivante e intuitivo.
+   - Stabilisci una lunghezza ottimale del contenuto, prendendo in considerazione l'analisi dei contenuti dei competitor.
 
 3. **META TITLE E DESCRIPTION OTTIMIZZATE**
-   - Meta title (50-60 caratteri) con keyword principale e brand
-   - Meta description (150-160 caratteri) che incorpori PAA e brand
-   - Capitalizzazione naturale italiana
+   - Sviluppa un meta title conciso (50-60 caratteri), includendo la keyword principale e il brand per massimizzare la rilevanza.
+   - Formula una meta description persuasiva (150-160 caratteri) che integri le PAA e il brand, assicurando un buon click-through rate (CTR).
+   - Utilizza una capitalizzazione naturale in italiano per migliorare la leggibilità.
 
 4. **STRATEGIA E-E-A-T POTENZIATA CON DATI REALI**
    
@@ -553,16 +553,16 @@ Genera un content brief completo che includa:
 
 5. **STRUTTURA CONTENUTO OTTIMIZZATA PER GOOGLE**
    - H1 ottimizzato per keyword principale
-   - H2/H3 che rispondono alle People Also Ask
+   - Suggerimenti sul contenuto dell'introduzione
+   - H2/H3 che rispondono alle People Also Ask, all'interno di ogni sezione di H2 e/o H3 devono essere presenti degli elenchi puntati dettagliati che suggeriscano le informazioni da sviluppare al loro interno
    - Sezioni per keyword correlate ad alto volume
    - Strategia per conquistare featured snippet
    - Risposte specifiche alle PAA di Google nel contenuto
 
 6. **INTEGRAZIONE PEOPLE ALSO ASK**
    Per ogni PAA di Google:
-   - Dove inserirla nella struttura
-   - Come rispondere meglio dei competitor
-   - Keyword correlate da usare nella risposta
+   - Per ogni PAA di Google, definisci chiaramente dove e come integrarla nella struttura del contenuto.
+   - Sviluppa strategie per rispondere in modo più efficace dei competitor, identificando keyword correlate da utilizzare nelle risposte.
 
 7. **KEYWORD CORRELATE E SEMANTICHE**
    - Come integrare keyword correlate SEMrush
@@ -570,7 +570,7 @@ Genera un content brief completo che includa:
    - Densità ottimale basata su competition score
 
 8. **LINK INTERNI STRATEGICI DATA-DRIVEN**
-   - Link basati su analisi del traffico potenziale
+   - Link basati su analisi del traffico potenziale e coerenti con il contenuto dell'articolo
    - Anchor text con keyword correlate
    - Distribuzione strategica per topic clustering
 
