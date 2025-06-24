@@ -1,4 +1,7 @@
-import streamlit as st
+def generate_content_brief(self, data: Dict, keyword_analysis: Dict) -> str:
+        """Genera il content brief usando OpenAI con analisi SEO avanzata e insights competitor"""
+        
+        # Analizza competitor in profonditàimport streamlit as st
 import openai
 import requests
 from bs4 import BeautifulSoup
@@ -118,8 +121,8 @@ class SEODataEnhancer:
         except Exception as e:
             return {'status': 'error', 'keyword': keyword, 'error': str(e)}
     
-    def get_semrush_related_keywords(self, keyword: str, country: str = "IT", limit: int = 20) -> List[Dict]:
-        """Ottiene keyword correlate da SEMrush"""
+    def get_semrush_related_keywords(self, keyword: str, country: str = "IT", limit: int = 50) -> List[Dict]:
+        """Ottiene keyword correlate da SEMrush - aumentato limite per analisi più profonda"""
         if not self.semrush_api_key:
             return []
         
@@ -156,8 +159,74 @@ class SEODataEnhancer:
             st.warning(f"Errore nell'ottenimento keyword correlate SEMrush: {str(e)}")
             return []
     
+    def analyze_keyword_intent_patterns(self, related_keywords: List[Dict]) -> Dict:
+        """Analizza i pattern di intento nelle keyword correlate"""
+        intent_categories = {
+            'informational': [],
+            'navigational': [],
+            'transactional': [],
+            'commercial': []
+        }
+        
+        # Pattern per classificare intent
+        informational_patterns = ['come', 'cosa', 'quando', 'dove', 'perché', 'guida', 'tutorial', 'cos è', 'significa']
+        transactional_patterns = ['acquista', 'compra', 'prezzo', 'costo', 'offerta', 'sconto', 'migliore', 'recensioni']
+        commercial_patterns = ['confronto', 'vs', 'alternative', 'migliori', 'top', 'classifica', 'recensione']
+        navigational_patterns = ['sito', 'ufficiale', 'login', 'accesso', 'brand']
+        
+        for kw_data in related_keywords:
+            keyword = kw_data['keyword'].lower()
+            
+            if any(pattern in keyword for pattern in informational_patterns):
+                intent_categories['informational'].append(kw_data)
+            elif any(pattern in keyword for pattern in transactional_patterns):
+                intent_categories['transactional'].append(kw_data)
+            elif any(pattern in keyword for pattern in commercial_patterns):
+                intent_categories['commercial'].append(kw_data)
+            elif any(pattern in keyword for pattern in navigational_patterns):
+                intent_categories['navigational'].append(kw_data)
+            else:
+                # Assegna alla categoria più probabile basata su CPC e competition
+                if kw_data['cpc'] > 1.0 and kw_data['competition'] > 0.5:
+                    intent_categories['transactional'].append(kw_data)
+                elif kw_data['competition'] > 0.3:
+                    intent_categories['commercial'].append(kw_data)
+                else:
+                    intent_categories['informational'].append(kw_data)
+        
+        return intent_categories
+    
+    def extract_topic_clusters(self, related_keywords: List[Dict]) -> Dict:
+        """Estrae cluster tematici dalle keyword correlate"""
+        clusters = {}
+        
+        for kw_data in related_keywords:
+            keyword = kw_data['keyword'].lower()
+            words = keyword.split()
+            
+            # Identifica temi principali
+            for word in words:
+                if len(word) > 3 and word not in ['come', 'cosa', 'quando', 'dove', 'perché', 'migliore', 'migliori']:
+                    if word not in clusters:
+                        clusters[word] = []
+                    clusters[word].append(kw_data)
+        
+        # Filtra cluster con almeno 2 keyword
+        filtered_clusters = {k: v for k, v in clusters.items() if len(v) >= 2}
+        
+        # Ordina per volume totale
+        for cluster_name, keywords in filtered_clusters.items():
+            total_volume = sum(kw['search_volume'] for kw in keywords)
+            filtered_clusters[cluster_name] = {
+                'keywords': keywords,
+                'total_volume': total_volume,
+                'avg_competition': sum(kw['competition'] for kw in keywords) / len(keywords)
+            }
+        
+        return filtered_clusters
+    
     def get_serper_search_data(self, query: str, country: str = "it") -> Dict:
-        """Ottiene dati SERP da Serper API"""
+        """Ottiene dati SERP da Serper API con analisi avanzata"""
         if not self.serper_api_key:
             return {'status': 'error', 'message': 'Serper API key non configurata'}
         
@@ -179,11 +248,25 @@ class SEODataEnhancer:
             
             data = response.json()
             
-            # Estrae People Also Ask
+            # Estrae People Also Ask con analisi dell'intent
             people_also_ask = []
+            paa_intents = {'informational': [], 'commercial': [], 'transactional': []}
+            
             if 'peopleAlsoAsk' in data:
                 for paa in data['peopleAlsoAsk']:
-                    people_also_ask.append(paa.get('question', ''))
+                    question = paa.get('question', '')
+                    people_also_ask.append(question)
+                    
+                    # Classifica intent della domanda
+                    q_lower = question.lower()
+                    if any(word in q_lower for word in ['come', 'cosa', 'quando', 'dove', 'perché']):
+                        paa_intents['informational'].append(question)
+                    elif any(word in q_lower for word in ['migliore', 'confronto', 'differenza', 'vs']):
+                        paa_intents['commercial'].append(question)
+                    elif any(word in q_lower for word in ['prezzo', 'costo', 'acquista', 'dove comprare']):
+                        paa_intents['transactional'].append(question)
+                    else:
+                        paa_intents['informational'].append(question)
             
             # Estrae Related Searches
             related_searches = []
@@ -191,34 +274,56 @@ class SEODataEnhancer:
                 for rs in data['relatedSearches']:
                     related_searches.append(rs.get('query', ''))
             
-            # Estrae Featured Snippet
+            # Analizza Featured Snippet per pattern di successo
             featured_snippet = None
+            snippet_analysis = {}
             if 'answerBox' in data:
+                snippet_text = data['answerBox'].get('snippet', '')
                 featured_snippet = {
-                    'snippet': data['answerBox'].get('snippet', ''),
+                    'snippet': snippet_text,
                     'title': data['answerBox'].get('title', ''),
                     'link': data['answerBox'].get('link', '')
                 }
+                
+                # Analizza struttura del snippet
+                snippet_analysis = {
+                    'word_count': len(snippet_text.split()),
+                    'has_list': '•' in snippet_text or '-' in snippet_text or any(char.isdigit() and '.' in snippet_text for char in snippet_text),
+                    'has_numbers': any(char.isdigit() for char in snippet_text),
+                    'structure_type': 'list' if ('•' in snippet_text or '-' in snippet_text) else 'paragraph',
+                    'starts_with_definition': snippet_text.lower().startswith(('è', 'sono', 'il', 'la', 'lo', 'una', 'un'))
+                }
             
-            # Estrae top 10 risultati organici
+            # Estrae top 10 risultati con analisi dei domini
             organic_results = []
+            domain_analysis = {}
+            
             if 'organic' in data:
                 for result in data['organic'][:10]:
+                    domain = urlparse(result.get('link', '')).netloc
+                    
                     organic_results.append({
                         'position': result.get('position', 0),
                         'title': result.get('title', ''),
                         'link': result.get('link', ''),
                         'snippet': result.get('snippet', ''),
-                        'domain': urlparse(result.get('link', '')).netloc
+                        'domain': domain
                     })
+                    
+                    # Conta frequenza domini
+                    if domain:
+                        domain_analysis[domain] = domain_analysis.get(domain, 0) + 1
             
             return {
                 'status': 'success',
                 'query': query,
                 'people_also_ask': people_also_ask,
+                'paa_intents': paa_intents,
                 'related_searches': related_searches,
                 'featured_snippet': featured_snippet,
+                'snippet_analysis': snippet_analysis,
                 'organic_results': organic_results,
+                'domain_analysis': domain_analysis,
                 'total_results': data.get('searchInformation', {}).get('totalResults', 0)
             }
             
@@ -229,116 +334,158 @@ class ContentBriefGenerator:
     def __init__(self, api_key: str, seo_enhancer: SEODataEnhancer = None):
         self.client = openai.OpenAI(api_key=api_key)
         self.seo_enhancer = seo_enhancer or SEODataEnhancer()
+    
+    def analyze_competitor_content(self, competitors: List[Dict]) -> Dict:
+        """Analizza in profondità il contenuto dei competitor per estrarre insight strategici"""
+        analysis = {
+            'common_topics': {},
+            'content_gaps': [],
+            'structural_patterns': {},
+            'keyword_usage_patterns': {},
+            'content_depth_analysis': {},
+            'unique_angles': {}
+        }
         
-    def scrape_url(self, url: str) -> Dict[str, str]:
-        """Scraping completo di una pagina web per estrarre tutti i contenuti rilevanti"""
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'it-IT,it;q=0.8,en-US;q=0.5,en;q=0.3',
-                'Accept-Encoding': 'gzip, deflate',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
+        # Analizza ogni competitor
+        for comp in competitors:
+            content = comp['content'].lower()
+            
+            # Estrae topic principali
+            topic_keywords = []
+            words = content.split()
+            
+            # Pattern per identificare topic importanti
+            for i, word in enumerate(words):
+                if len(word) > 4:  # Parole significative
+                    # Context window per capire importanza
+                    context_before = words[max(0, i-3):i]
+                    context_after = words[i+1:min(len(words), i+4)]
+                    
+                    # Se la parola appare in contesti importanti
+                    if any(ctx in ['importante', 'fondamentale', 'essenziale', 'principale', 'primo', 'migliore'] for ctx in context_before + context_after):
+                        topic_keywords.append(word)
+            
+            # Conta frequenza topic
+            for topic in topic_keywords:
+                if topic not in analysis['common_topics']:
+                    analysis['common_topics'][topic] = 0
+                analysis['common_topics'][topic] += 1
+            
+            # Analizza struttura contenuto
+            headings = comp.get('headings', '').split('\n')
+            heading_patterns = []
+            for heading in headings:
+                if heading.strip():
+                    h_level = heading.split(':')[0] if ':' in heading else 'H1'
+                    h_text = heading.split(':', 1)[1].strip() if ':' in heading else heading
+                    
+                    # Pattern strutturali
+                    if 'come' in h_text.lower():
+                        heading_patterns.append('how_to')
+                    elif 'cosa' in h_text.lower():
+                        heading_patterns.append('what_is')
+                    elif 'perché' in h_text.lower():
+                        heading_patterns.append('why')
+                    elif 'migliori' in h_text.lower() or 'top' in h_text.lower():
+                        heading_patterns.append('best_list')
+                    elif 'confronto' in h_text.lower() or 'vs' in h_text.lower():
+                        heading_patterns.append('comparison')
+            
+            # Accumula pattern strutturali
+            for pattern in heading_patterns:
+                if pattern not in analysis['structural_patterns']:
+                    analysis['structural_patterns'][pattern] = 0
+                analysis['structural_patterns'][pattern] += 1
+            
+            # Analizza profondità contenuto
+            paragraphs = comp.get('paragraphs', [])
+            analysis['content_depth_analysis'][f"competitor_{comp['competitor_number']}"] = {
+                'total_paragraphs': len(paragraphs),
+                'avg_paragraph_length': sum(len(p.split()) for p in paragraphs) / len(paragraphs) if paragraphs else 0,
+                'word_count': comp['word_count'],
+                'has_lists': 'lista' in content or 'elenco' in content or '•' in comp['content'],
+                'has_examples': 'esempio' in content or 'ad esempio' in content,
+                'technical_depth': content.count('tecnic') + content.count('specific') + content.count('dettagli')
             }
+        
+        # Identifica gap di contenuto
+        all_topics = set()
+        for comp in competitors:
+            words = comp['content'].lower().split()
+            comp_topics = [w for w in words if len(w) > 5]
+            all_topics.update(comp_topics)
+        
+        # Topic coverage analysis
+        topic_coverage = {}
+        for topic in all_topics:
+            coverage_count = sum(1 for comp in competitors if topic in comp['content'].lower())
+            topic_coverage[topic] = coverage_count
+        
+        # Identifica topic coperti da pochi competitor (opportunità)
+        analysis['content_gaps'] = [
+            topic for topic, count in topic_coverage.items() 
+            if count == 1 and len(topic) > 6  # Topic unici e significativi
+        ][:10]
+        
+        return analysis
+    
+    def extract_search_intent_insights(self, keyword_analysis: Dict) -> Dict:
+        """Estrae insight avanzati sull'intento di ricerca"""
+        insights = {
+            'primary_intent': 'informational',
+            'intent_distribution': {},
+            'content_suggestions': {},
+            'user_journey_stage': 'awareness',
+            'competition_level': 'medium'
+        }
+        
+        # Analizza dati SEMrush
+        if keyword_analysis.get('semrush_data', {}).get('status') == 'success':
+            semrush = keyword_analysis['semrush_data']
             
-            response = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
-            response.raise_for_status()
+            # Determina intent principale da CPC e competition
+            cpc = semrush.get('cpc', 0)
+            competition = semrush.get('competition', 0)
             
-            soup = BeautifulSoup(response.content, 'html.parser')
+            if cpc > 2.0 and competition > 0.7:
+                insights['primary_intent'] = 'transactional'
+                insights['user_journey_stage'] = 'decision'
+            elif cpc > 1.0 and competition > 0.4:
+                insights['primary_intent'] = 'commercial'
+                insights['user_journey_stage'] = 'consideration'
+            else:
+                insights['primary_intent'] = 'informational'
+                insights['user_journey_stage'] = 'awareness'
             
-            # Rimuove script, style, nav, footer, sidebar
-            for element in soup(["script", "style", "nav", "footer", "aside", "header"]):
-                element.decompose()
+            # Livello competizione
+            if competition > 0.8:
+                insights['competition_level'] = 'high'
+            elif competition > 0.4:
+                insights['competition_level'] = 'medium'
+            else:
+                insights['competition_level'] = 'low'
+        
+        # Analizza keyword correlate
+        if keyword_analysis.get('related_keywords'):
+            intent_patterns = keyword_analysis.get('intent_categories', {})
+            total_keywords = len(keyword_analysis['related_keywords'])
             
-            # Estrae il titolo
-            title = soup.find('title')
-            title_text = title.get_text().strip() if title else ""
+            if total_keywords > 0:
+                for intent, keywords in intent_patterns.items():
+                    insights['intent_distribution'][intent] = len(keywords) / total_keywords
+        
+        # Analizza PAA per suggerimenti contenuto
+        if keyword_analysis.get('serper_data', {}).get('paa_intents'):
+            paa_intents = keyword_analysis['serper_data']['paa_intents']
             
-            # Estrae meta description
-            meta_desc = soup.find('meta', attrs={'name': 'description'})
-            if not meta_desc:
-                meta_desc = soup.find('meta', attrs={'property': 'og:description'})
-            meta_desc_text = meta_desc.get('content', '') if meta_desc else ""
-            
-            # Estrae meta keywords
-            meta_keywords = soup.find('meta', attrs={'name': 'keywords'})
-            meta_keywords_text = meta_keywords.get('content', '') if meta_keywords else ""
-            
-            # Estrae headings con gerarchia
-            headings = []
-            for i in range(1, 7):
-                for heading in soup.find_all(f'h{i}'):
-                    headings.append(f"H{i}: {heading.get_text().strip()}")
-            
-            # Estrae tutto il contenuto testuale
-            for unwanted in soup.find_all(['button', 'form', 'input', 'select', 'textarea']):
-                unwanted.decompose()
-            
-            # Estrae il contenuto principale
-            main_content = ""
-            main_selectors = [
-                'main', 'article', '[role="main"]', 
-                '.content', '.main-content', '.post-content',
-                '.entry-content', '.article-content', '#content'
-            ]
-            
-            for selector in main_selectors:
-                main_element = soup.select_one(selector)
-                if main_element:
-                    main_content = main_element.get_text()
-                    break
-            
-            if not main_content:
-                body = soup.find('body')
-                if body:
-                    main_content = body.get_text()
-                else:
-                    main_content = soup.get_text()
-            
-            main_content = re.sub(r'\s+', ' ', main_content).strip()
-            
-            # Estrae paragrafi strutturati
-            paragraphs = []
-            for p in soup.find_all('p'):
-                p_text = p.get_text().strip()
-                if len(p_text) > 50:
-                    paragraphs.append(p_text)
-            
-            # Estrae liste
-            lists = []
-            for ul in soup.find_all(['ul', 'ol']):
-                list_items = [li.get_text().strip() for li in ul.find_all('li')]
-                if list_items:
-                    lists.append(list_items)
-            
-            return {
-                'url': url,
-                'title': title_text,
-                'meta_description': meta_desc_text,
-                'meta_keywords': meta_keywords_text,
-                'headings': '\n'.join(headings),
-                'content': main_content,
-                'paragraphs': paragraphs[:10],
-                'lists': lists[:5],
-                'word_count': len(main_content.split()),
-                'status': 'success'
+            insights['content_suggestions'] = {
+                'faq_section_needed': len(paa_intents.get('informational', [])) > 2,
+                'comparison_section_needed': len(paa_intents.get('commercial', [])) > 1,
+                'pricing_section_needed': len(paa_intents.get('transactional', [])) > 1,
+                'how_to_section_needed': any('come' in q.lower() for q in keyword_analysis['serper_data'].get('people_also_ask', []))
             }
-            
-        except Exception as e:
-            return {
-                'url': url,
-                'title': "",
-                'meta_description': "",
-                'meta_keywords': "",
-                'headings': "",
-                'content': "",
-                'paragraphs': [],
-                'lists': [],
-                'word_count': 0,
-                'status': 'error',
-                'error': str(e)
-            }
+        
+        return insights
     
     def get_sitemap_urls(self, sitemap_url: str) -> List[str]:
         """Estrae le URL dalla sitemap con gestione di sitemap multiple"""
@@ -398,20 +545,25 @@ class ContentBriefGenerator:
             return []
     
     def analyze_keywords_with_apis(self, keywords: str) -> Dict:
-        """Analizza le keyword usando SEMrush e Serper"""
+        """Analizza le keyword usando SEMrush e Serper con analisi avanzata"""
         keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
         main_keyword = keyword_list[0] if keyword_list else ""
         
         # Dati SEMrush
         semrush_data = {}
         related_keywords = []
+        intent_categories = {}
+        topic_clusters = {}
         
         if main_keyword:
             semrush_data = self.seo_enhancer.get_semrush_keyword_data(main_keyword)
             if semrush_data.get('status') == 'success':
-                related_keywords = self.seo_enhancer.get_semrush_related_keywords(main_keyword)
+                related_keywords = self.seo_enhancer.get_semrush_related_keywords(main_keyword, limit=50)
+                if related_keywords:
+                    intent_categories = self.seo_enhancer.analyze_keyword_intent_patterns(related_keywords)
+                    topic_clusters = self.seo_enhancer.extract_topic_clusters(related_keywords)
         
-        # Dati Serper
+        # Dati Serper con analisi avanzata
         serper_data = {}
         if main_keyword:
             serper_data = self.seo_enhancer.get_serper_search_data(main_keyword)
@@ -421,26 +573,252 @@ class ContentBriefGenerator:
             'all_keywords': keyword_list,
             'semrush_data': semrush_data,
             'related_keywords': related_keywords,
+            'intent_categories': intent_categories,
+            'topic_clusters': topic_clusters,
             'serper_data': serper_data
         }
     
     def generate_content_brief(self, data: Dict, keyword_analysis: Dict) -> str:
-        """Genera il content brief usando OpenAI con dati SEO reali"""
+        """Genera il content brief usando OpenAI con analisi SEO avanzata e insights competitor"""
         
-        # Prepara i dati dei competitor
+        # Analizza competitor in profondità
+        competitor_insights = self.analyze_competitor_content(data['competitors'])
+        
+        # Estrae insight sull'intento di ricerca
+        search_intent_insights = self.extract_search_intent_insights(keyword_analysis)
+        
+        # Prepara i dati dei competitor con analisi avanzata
         competitor_data = ""
-        for i, comp in enumerate(data['competitors'], 1):
-            competitor_data += f"\n--- COMPETITOR {i} ---\n"
+        for comp in data['competitors']:
+            competitor_data += f"\n--- COMPETITOR {comp['competitor_number']} ---\n"
             competitor_data += f"URL: {comp['url']}\n"
-            competitor_data += f"Titolo: {comp['title']}\n"
-            competitor_data += f"Meta Description: {comp['meta_description']}\n"
-            competitor_data += f"Meta Keywords: {comp['meta_keywords']}\n"
-            competitor_data += f"Struttura Headings:\n{comp['headings']}\n"
+            if comp['title'] != f"Competitor {comp['competitor_number']}":
+                competitor_data += f"Titolo: {comp['title']}\n"
+            if comp['meta_description']:
+                competitor_data += f"Meta Description: {comp['meta_description']}\n"
+            if comp['headings']:
+                competitor_data += f"Struttura titoli identificata:\n{comp['headings']}\n"
             competitor_data += f"Numero parole: {comp['word_count']}\n"
-            if comp['status'] == 'success':
-                competitor_data += f"Contenuto (estratto): {comp['content'][:2000]}...\n"
-            else:
-                competitor_data += f"Contenuto manuale: {comp.get('manual_content', 'Non disponibile')}\n"
+            competitor_data += f"Contenuto completo: {comp['content'][:3000]}...\n"  # Primi 3000 caratteri
+        
+        # Prepara analisi competitor avanzata
+        competitor_analysis = f"""
+ANALISI AVANZATA COMPETITOR:
+- Topic più comuni: {', '.join(list(competitor_insights['common_topics'].keys())[:10])}
+- Pattern strutturali dominanti: {', '.join(competitor_insights['structural_patterns'].keys())}
+- Gap di contenuto identificati: {', '.join(competitor_insights['content_gaps'][:5])}
+- Profondità media contenuto: {sum(comp['word_count'] for comp in data['competitors']) / len(data['competitors']):.0f} parole
+- Elementi strutturali mancanti: {', '.join([k for k, v in competitor_insights['content_depth_analysis'].items()])}
+"""
+        
+        # Prepara dati SEMrush avanzati
+        semrush_info = ""
+        if keyword_analysis['semrush_data'].get('status') == 'success':
+            sd = keyword_analysis['semrush_data']
+            semrush_info = f"""
+DATI SEMRUSH KEYWORD PRINCIPALE "{keyword_analysis['main_keyword']}":
+- Volume di ricerca mensile: {sd.get('search_volume', 'N/A')}
+- CPC: €{sd.get('cpc', 'N/A')} (Indicatore intent: {'Transactional' if sd.get('cpc', 0) > 2 else 'Commercial' if sd.get('cpc', 0) > 1 else 'Informational'})
+- Competizione: {sd.get('competition', 'N/A')}/1.0 (Livello: {'Alto' if sd.get('competition', 0) > 0.7 else 'Medio' if sd.get('competition', 0) > 0.4 else 'Basso'})
+- Risultati totali: {sd.get('results_count', 'N/A')}
+"""
+        
+        # Prepara keyword correlate per intent
+        related_kw_by_intent = ""
+        if keyword_analysis.get('intent_categories'):
+            for intent, keywords in keyword_analysis['intent_categories'].items():
+                if keywords:
+                    related_kw_by_intent += f"\nKEYWORD {intent.upper()}:\n"
+                    top_keywords = sorted(keywords, key=lambda x: x['search_volume'], reverse=True)[:5]
+                    for kw in top_keywords:
+                        related_kw_by_intent += f"- {kw['keyword']} (Vol: {kw['search_volume']}, Comp: {kw['competition']:.2f})\n"
+        
+        # Prepara cluster tematici
+        topic_clusters_info = ""
+        if keyword_analysis.get('topic_clusters'):
+            topic_clusters_info = "CLUSTER TEMATICI DA SEMRUSH:\n"
+            sorted_clusters = sorted(keyword_analysis['topic_clusters'].items(), 
+                                   key=lambda x: x[1]['total_volume'], reverse=True)[:5]
+            for cluster_name, cluster_data in sorted_clusters:
+                topic_clusters_info += f"- Tema '{cluster_name}': {cluster_data['total_volume']} vol. totale, {len(cluster_data['keywords'])} keyword\n"
+        
+        # Prepara dati Serper avanzati
+        serper_info = ""
+        if keyword_analysis['serper_data'].get('status') == 'success':
+            sd = keyword_analysis['serper_data']
+            
+            if sd.get('people_also_ask'):
+                serper_info += "PEOPLE ALSO ASK DA GOOGLE (CLASSIFICATE PER INTENT):\n"
+                paa_intents = sd.get('paa_intents', {})
+                for intent, questions in paa_intents.items():
+                    if questions:
+                        serper_info += f"\n{intent.upper()}:\n"
+                        for q in questions[:3]:
+                            serper_info += f"- {q}\n"
+            
+            if sd.get('related_searches'):
+                serper_info += f"\nRICERCHE CORRELATE DA GOOGLE:\n"
+                for rs in sd['related_searches'][:5]:
+                    serper_info += f"- {rs}\n"
+            
+            if sd.get('featured_snippet'):
+                snippet_analysis = sd.get('snippet_analysis', {})
+                serper_info += f"\nFEATURED SNIPPET ATTUALE - ANALISI STRUTTURALE:\n"
+                serper_info += f"Titolo: {sd['featured_snippet']['title']}\n"
+                serper_info += f"Lunghezza: {snippet_analysis.get('word_count', 0)} parole\n"
+                serper_info += f"Tipo struttura: {snippet_analysis.get('structure_type', 'paragraph')}\n"
+                serper_info += f"Contiene liste: {'Sì' if snippet_analysis.get('has_list') else 'No'}\n"
+                serper_info += f"Contiene numeri: {'Sì' if snippet_analysis.get('has_numbers') else 'No'}\n"
+                serper_info += f"Snippet: {sd['featured_snippet']['snippet'][:200]}...\n"
+        
+        # Prepara insight intento di ricerca
+        intent_insights = f"""
+ANALISI INTENTO DI RICERCA AVANZATA:
+- Intent principale: {search_intent_insights['primary_intent']}
+- Fase user journey: {search_intent_insights['user_journey_stage']}
+- Livello competizione: {search_intent_insights['competition_level']}
+- Distribuzione intent: {search_intent_insights.get('intent_distribution', {})}
+- Sezioni consigliate: {search_intent_insights.get('content_suggestions', {})}
+"""
+        
+        # Prepara le URL interne
+        internal_urls = "\n".join(data['sitemap_urls'][:30]) if data['sitemap_urls'] else data.get('manual_urls', 'Nessuna URL interna disponibile')
+        
+        prompt = f"""
+Sei un esperto SEO content strategist e data analyst specializzato in E-E-A-T. Devi creare un content brief ESTREMAMENTE DETTAGLIATO e ACTIONABLE basato su DATI SEO REALI e ANALISI AVANZATA dei competitor.
+
+INFORMAZIONI CLIENTE:
+- Brand: {data['brand']}
+- Sito web: {data['website']}
+- Argomento: {data['topic']}
+- Keyword principali: {data['keywords']}
+- Domande frequenti inserite: {data['faqs']}
+- Tone of voice: {', '.join(data['tone_of_voice'])}
+
+{semrush_info}
+
+{related_kw_by_intent}
+
+{topic_clusters_info}
+
+{serper_info}
+
+{intent_insights}
+
+{competitor_analysis}
+
+ANALISI DETTAGLIATA COMPETITOR:
+{competitor_data}
+
+URL INTERNE DISPONIBILI (per link interni):
+{internal_urls}
+
+ISTRUZIONI SPECIFICHE:
+- Il brand "{data['brand']}" DEVE apparire nel meta title alla fine
+- Il brand "{data['brand']}" DEVE apparire nella meta description
+- Usa la capitalizzazione naturale italiana (prima lettera maiuscola il resto minuscolo, ad esempio 'Mutuo per Acquisto Garage: Tutto Quello che Devi Sapere' NON va bene, 'Mutuo per acquisto garage: tutto quello che devi sapere' va bene
+- Utilizza TUTTI i dati reali per creare suggerimenti specifici e actionable
+- Per ogni H2/H3 fornisci istruzioni DETTAGLIATE su cosa scrivere all'interno di quel paragrafo tramite degli elenchi puntati dettagliati
+- Sfrutta i gap dei competitor per opportunità uniche
+- Integra keyword correlate per intent specifici
+- Rispondi strategicamente alle PAA classificate per intent
+
+Genera un content brief che includa:
+
+1. **STRATEGIA SEO DATA-DRIVEN AVANZATA**
+   - Analisi intent basata su CPC ({keyword_analysis['semrush_data'].get('cpc', 0)}€) e competition ({keyword_analysis['semrush_data'].get('competition', 0)})
+   - Strategia per fase user journey: {search_intent_insights['user_journey_stage']}
+   - Piano per battere featured snippet attuale (se presente)
+   - Sfruttamento gap competitor identificati
+
+2. **META OTTIMIZZATI CON DATI REALI**
+   - Meta title (50-60 caratteri) ottimizzato per volume {keyword_analysis['semrush_data'].get('search_volume', 0)}
+   - Meta description che incorpora PAA ad alto search intent
+   - Keyword correlate strategiche da integrare
+
+3. **STRUTTURA CONTENUTO ESTREMAMENTE DETTAGLIATA**
+   
+   **H1 OTTIMIZZATO:**
+   - H1 specifico con keyword principale
+   - Giustificazione scelta basata su dati competitor
+   
+   **INTRODUZIONE STRATEGICA:**
+   - Cosa scrivere nei primi 2-3 paragrafi
+   - Come incorporare keyword principale naturalmente
+   - Hook basato su gap competitor identificati
+   - Lunghezza ottimale e elementi da includere
+   
+   **SEZIONI H2 CON ISTRUZIONI DETTAGLIATE:**
+   Per ogni H2 fornisci:
+   - Titolo H2 ottimizzato per keyword correlate specifiche
+   - 4-6 bullet point DETTAGLIATI su cosa scrivere in quel paragrafo
+   - Keyword correlate specifiche da integrare (con volumi di ricerca)
+   - PAA specifiche da rispondere in quella sezione
+   - Esempi concreti da includere
+   - Lunghezza paragrafo consigliata
+   - Elementi aggiuntivi (liste, tabelle, immagini)
+   - Link interni strategici con anchor text specifiche
+   
+   **SOTTOSEZIONI H3 QUANDO NECESSARIO:**
+   - H3 per approfondimenti specifici
+   - Istruzioni puntuali su contenuto
+   - Keyword long-tail da targetizzare
+   
+   **SEZIONI SPECIALI BASATE SU DATI:**
+   - Sezione FAQ (se PAA > 3)
+   - Sezione confronto (se keyword commercial presenti)
+   - Sezione how-to (se keyword informational dominanti)
+   - Sezione pricing/costi (se CPC > 1€)
+
+4. **STRATEGIA PEOPLE ALSO ASK AVANZATA**
+   Per ogni PAA da Google:
+   - In quale sezione H2/H3 rispondere
+   - Come strutturare la risposta (lunghezza, formato)
+   - Keyword correlate da includere nella risposta
+   - Opportunità per featured snippet
+
+5. **INTEGRAZIONE KEYWORD CORRELATE PER TOPIC CLUSTER**
+   Per ogni cluster tematico identificato:
+   - Dove integrare le keyword del cluster
+   - Densità ottimale basata su competition
+   - Long-tail opportunities ad alto volume
+
+6. **STRATEGIA LINK INTERNI DATA-DRIVEN**
+   - Link basati su keyword correlate e volumi
+   - Anchor text ottimizzate per topic cluster
+   - Distribuzione strategica per massimizzare ranking
+
+7. **ELEMENTI E-E-A-T SPECIFICI**
+   - Fonti autorevoli che competitor non usano
+   - Dati statistici più recenti
+   - Esempi pratici basati su ricerche correlate reali
+   - Authority signals da includere
+
+8. **PIANO IMPLEMENTAZIONE COPYWRITER**
+   - Checklist step-by-step per copywriter
+   - Metriche da raggiungere (lunghezza, keyword density)
+   - Elementi obbligatori per ogni sezione
+   - KPI di successo previsti
+
+Crea un brief che permetta al copywriter di scrivere contenuto SUPERIORE ai competitor utilizzando ESCLUSIVAMENTE dati reali e analisi avanzate. Ogni suggerimento deve essere specifico, actionable e basato sui dati forniti.
+"""
+
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "Sei un esperto SEO data analyst e content strategist che crea content brief estremamente dettagliati e actionable utilizzando dati reali di SEMrush, Serper e analisi competitor avanzate per garantire posizionamenti top su Google."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=4000,
+                temperature=0.3  # Più deterministico per dati specifici
+            )
+            
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            st.error(f"Errore nella generazione del content brief: {str(e)}")
+            return "Errore nella generazione del contenuto."
         
         # Prepara dati SEMrush
         semrush_info = ""
@@ -515,23 +893,23 @@ IMPORTANTE:
 - Considera le keyword correlate di SEMrush per arricchire il contenuto
 - Analizza il featured snippet esistente per superarlo
 
-Genera un content brief completo e dettagliato per un articolo ottimizzato per SEO, seguendo i seguenti punti chiave:
+Genera un content brief completo che includa:
 
-1. **ANALISI DELL'INTENTO DI RICERCA E DEL GOAL STRATEGICO BASATA SU DATI DI MERCATO REALE**
-   - Esegui un'analisi approfondita dell'intento di ricerca, utilizzando i dati di volume di SEMrush e le domande frequenti (PAA) di Google come riferimento fondamentale.
-   - Definisci chiaramente l'obiettivo del contenuto, tenendo in considerazione parametri come il CPC e il competition score attuali nel mercato.
-   - Proponi una strategia dettagliata per superare i competitor analizzando i featured snippet e identificando i top 10 risultati, evidenziando le leve che possono fare la differenza.
+1. **ANALISI INTENTO DI RICERCA E OBIETTIVO BASATA SU DATI REALI**
+   - Analizza l'intento basandoti sui dati di volume SEMrush e le PAA di Google
+   - Definisci l'obiettivo considerando la competizione reale (CPC e competition score)
+   - Strategia per battere i competitor analizzando featured snippet e top 10
 
 2. **LINEE GUIDA SEO E STILE CON KEYWORD DATA-DRIVEN**
-   - Integra keyword correlate ottenute da SEMrush, ottimizzando la densità e il posizionamento per massimizzare l'efficacia SEO.
-   - Incorpora in modo naturale le ricerche correlate di Google all'interno del testo.
-   - Definisci lo stile di scrittura in base ai volumi di ricerca e alla competizione, assicurandoti che il contenuto sia accattivante e intuitivo.
-   - Stabilisci una lunghezza ottimale del contenuto, prendendo in considerazione l'analisi dei contenuti dei competitor.
+   - Utilizza keyword correlate di SEMrush per densità e posizionamento
+   - Incorpora naturalmente le ricerche correlate di Google
+   - Stile basato sui volumi di ricerca e competizione
+   - Lunghezza ottimale basata sull'analisi competitor
 
 3. **META TITLE E DESCRIPTION OTTIMIZZATE**
-   - Sviluppa un meta title conciso (50-60 caratteri), includendo la keyword principale e il brand per massimizzare la rilevanza.
-   - Formula una meta description persuasiva (150-160 caratteri) che integri le PAA e il brand, assicurando un buon click-through rate (CTR).
-   - Utilizza una capitalizzazione naturale in italiano per migliorare la leggibilità.
+   - Meta title (50-60 caratteri) con keyword principale e brand
+   - Meta description (150-160 caratteri) che incorpori PAA e brand
+   - Capitalizzazione naturale italiana
 
 4. **STRATEGIA E-E-A-T POTENZIATA CON DATI REALI**
    
@@ -553,16 +931,16 @@ Genera un content brief completo e dettagliato per un articolo ottimizzato per S
 
 5. **STRUTTURA CONTENUTO OTTIMIZZATA PER GOOGLE**
    - H1 ottimizzato per keyword principale
-   - Suggerimenti sul contenuto dell'introduzione
-   - H2/H3 che rispondono alle People Also Ask, all'interno di ogni sezione di H2 e/o H3 devono essere presenti degli elenchi puntati dettagliati che suggeriscano le informazioni da sviluppare al loro interno
+   - H2/H3 che rispondono alle People Also Ask
    - Sezioni per keyword correlate ad alto volume
    - Strategia per conquistare featured snippet
    - Risposte specifiche alle PAA di Google nel contenuto
 
 6. **INTEGRAZIONE PEOPLE ALSO ASK**
    Per ogni PAA di Google:
-   - Per ogni PAA di Google, definisci chiaramente dove e come integrarla nella struttura del contenuto.
-   - Sviluppa strategie per rispondere in modo più efficace dei competitor, identificando keyword correlate da utilizzare nelle risposte.
+   - Dove inserirla nella struttura
+   - Come rispondere meglio dei competitor
+   - Keyword correlate da usare nella risposta
 
 7. **KEYWORD CORRELATE E SEMANTICHE**
    - Come integrare keyword correlate SEMrush
@@ -570,7 +948,7 @@ Genera un content brief completo e dettagliato per un articolo ottimizzato per S
    - Densità ottimale basata su competition score
 
 8. **LINK INTERNI STRATEGICI DATA-DRIVEN**
-   - Link basati su analisi del traffico potenziale e coerenti con il contenuto dell'articolo
+   - Link basati su analisi del traffico potenziale
    - Anchor text con keyword correlate
    - Distribuzione strategica per topic clustering
 
@@ -769,66 +1147,110 @@ def main():
         manual_urls = st.text_area("📎 URL interne manuali", placeholder="https://www.sito.it/pagina1\nhttps://www.sito.it/pagina2", height=100)
         
         st.markdown('<h3 class="section-header">🔍 Analisi competitor</h3>', unsafe_allow_html=True)
-        st.markdown('<div class="info-box">Inserisci 3 URL di competitor. Se il sistema non riesce ad accedere, potrai incollare il contenuto manualmente</div>', unsafe_allow_html=True)
+        st.markdown('<div class="info-box">🎯 <strong>Inserimento manuale obbligatorio</strong>: Incolla il contenuto testuale completo di ogni competitor per un\'analisi più precisa e affidabile</div>', unsafe_allow_html=True)
         
         competitor_data = []
         for i in range(3):
-            st.markdown(f"**Competitor {i+1}**")
-            col_url, col_manual = st.columns([2, 1])
+            st.markdown(f"**📊 Competitor {i+1}**")
             
-            with col_url:
-                url = st.text_input(f"🌐 URL Competitor {i+1}", key=f"comp_url_{i}", placeholder="https://competitor.example.com/articolo")
+            # URL del competitor (opzionale, solo per riferimento)
+            url = st.text_input(f"🌐 URL Competitor {i+1} (opzionale)", key=f"comp_url_{i}", placeholder="https://competitor.example.com/articolo", help="Solo per riferimento nel brief")
             
-            with col_manual:
-                use_manual = st.checkbox(f"Contenuto manuale", key=f"manual_{i}")
+            # Contenuto testuale (obbligatorio)
+            manual_content = st.text_area(
+                f"📝 Contenuto testuale completo Competitor {i+1} *", 
+                key=f"comp_content_{i}", 
+                placeholder="Incolla qui tutto il contenuto testuale della pagina competitor (titoli, paragrafi, liste, etc.)",
+                height=200,
+                help="Copia e incolla tutto il testo della pagina competitor per un'analisi completa"
+            )
             
-            manual_content = ""
-            if use_manual:
-                manual_content = st.text_area(f"📝 Contenuto testuale Competitor {i+1}", key=f"comp_content_{i}", placeholder="Incolla qui tutto il contenuto testuale della pagina competitor", height=150)
+            # Input aggiuntivi per analisi più dettagliata
+            col1, col2 = st.columns(2)
+            with col1:
+                comp_title = st.text_input(f"📋 Title tag Competitor {i+1}", key=f"comp_title_{i}", placeholder="Title tag della pagina competitor")
+            with col2:
+                comp_meta = st.text_input(f"📄 Meta description Competitor {i+1}", key=f"comp_meta_{i}", placeholder="Meta description della pagina")
             
-            if url:
+            if manual_content.strip():  # Solo se c'è contenuto
                 competitor_data.append({
-                    'url': url,
+                    'url': url if url else f"Competitor {i+1}",
                     'manual_content': manual_content,
-                    'use_manual': use_manual
+                    'manual_title': comp_title,
+                    'manual_meta': comp_meta,
+                    'competitor_number': i+1
                 })
+        
+        # Mostra quanti competitor sono stati inseriti
+        if competitor_data:
+            st.success(f"✅ {len(competitor_data)} competitor pronti per l'analisi")
         
         submitted = st.form_submit_button("🚀 Genera content brief con dati SEO reali", use_container_width=True)
     
     if submitted:
-        # Validazione input
+        # Validazione input migliorata
         if not all([brand, website, topic, keywords]):
             st.error("❌ Compila tutti i campi obbligatori: Brand, Website, Argomento e Keywords")
             return
         
         if not competitor_data:
-            st.error("❌ Inserisci almeno un URL competitor")
+            st.error("❌ Inserisci il contenuto di almeno un competitor per procedere con l'analisi")
+            return
+        
+        # Controllo che ci sia contenuto nei competitor
+        valid_competitors_count = len([c for c in competitor_data if c['manual_content'].strip()])
+        if valid_competitors_count == 0:
+            st.error("❌ Inserisci il contenuto testuale di almeno un competitor")
             return
         
         with st.spinner("🔄 Generazione del content brief con dati SEO reali..."):
             progress_bar = st.progress(0)
             
-            # Step 1: Analisi keyword con API
+            # Step 1: Analisi keyword con API avanzata
             if semrush_api_key or serper_api_key:
-                st.info("🔍 Analisi keyword con SEMrush e Serper...")
+                st.info("🔍 Analisi keyword avanzata con SEMrush e Serper...")
                 keyword_analysis = generator.analyze_keywords_with_apis(keywords)
                 progress_bar.progress(15)
                 
-                # Mostra preview dati SEO
+                # Mostra preview dati SEO avanzati
                 if keyword_analysis['semrush_data'].get('status') == 'success':
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2, col3, col4 = st.columns(4)
                     with col1:
                         st.metric("📈 Volume ricerca", f"{keyword_analysis['semrush_data']['search_volume']:,}")
                     with col2:
                         st.metric("💰 CPC", f"€{keyword_analysis['semrush_data']['cpc']:.2f}")
                     with col3:
                         st.metric("⚔️ Competition", f"{keyword_analysis['semrush_data']['competition']:.2f}")
+                    with col4:
+                        intent = 'Transactional' if keyword_analysis['semrush_data']['cpc'] > 2 else 'Commercial' if keyword_analysis['semrush_data']['cpc'] > 1 else 'Informational'
+                        st.metric("🎯 Intent", intent)
                 
-                if keyword_analysis['serper_data'].get('people_also_ask'):
-                    st.success(f"✅ Trovate {len(keyword_analysis['serper_data']['people_also_ask'])} People Also Ask da Google")
+                # Mostra cluster tematici
+                if keyword_analysis.get('topic_clusters'):
+                    st.success(f"✅ Identificati {len(keyword_analysis['topic_clusters'])} cluster tematici")
+                
+                # Mostra analisi PAA
+                if keyword_analysis.get('serper_data', {}).get('people_also_ask'):
+                    paa_count = len(keyword_analysis['serper_data']['people_also_ask'])
+                    st.success(f"✅ Analizzate {paa_count} People Also Ask con classificazione intent")
+                
+                # Mostra intent distribution
+                if keyword_analysis.get('intent_categories'):
+                    intent_summary = []
+                    for intent, kws in keyword_analysis['intent_categories'].items():
+                        if kws:
+                            intent_summary.append(f"{intent}: {len(kws)} keyword")
+                    if intent_summary:
+                        st.info(f"📊 Distribuzione intent: {', '.join(intent_summary)}")
             else:
                 st.info("📊 Analisi keyword base (senza API esterne)...")
-                keyword_analysis = {'main_keyword': keywords.split(',')[0].strip(), 'semrush_data': {}, 'serper_data': {}}
+                keyword_analysis = {
+                    'main_keyword': keywords.split(',')[0].strip(), 
+                    'semrush_data': {}, 
+                    'serper_data': {},
+                    'intent_categories': {},
+                    'topic_clusters': {}
+                }
                 progress_bar.progress(15)
             
             # Step 2: Estrazione sitemap
@@ -848,39 +1270,44 @@ def main():
             
             progress_bar.progress(35)
             
-            # Step 3: Scraping competitor
-            st.info("🕷️ Analisi competitor in corso...")
-            competitors_scraped = []
+            # Step 3: Preparazione dati competitor (solo manuali)
+            st.info("📊 Elaborazione contenuti competitor inseriti manualmente...")
+            competitors_processed = []
             
-            for i, comp_data in enumerate(competitor_data):
-                if comp_data['use_manual'] and comp_data['manual_content']:
-                    scraped_data = {
-                        'url': comp_data['url'],
-                        'title': f"Competitor {i+1} (contenuto manuale)",
-                        'meta_description': "",
-                        'meta_keywords': "",
-                        'headings': "",
-                        'content': comp_data['manual_content'],
-                        'paragraphs': comp_data['manual_content'].split('\n\n')[:10],
-                        'lists': [],
-                        'word_count': len(comp_data['manual_content'].split()),
-                        'status': 'manual'
-                    }
-                else:
-                    scraped_data = generator.scrape_url(comp_data['url'])
+            for comp_data in competitor_data:
+                if comp_data['manual_content'].strip():
+                    # Processa il contenuto manuale
+                    content = comp_data['manual_content']
+                    word_count = len(content.split())
                     
-                    if scraped_data['status'] == 'error':
-                        st.error(f"❌ Impossibile accedere a {comp_data['url']}")
-                        st.markdown('<div class="error-box">Per continuare, usa l\'opzione "Contenuto manuale" e incolla il testo della pagina</div>', unsafe_allow_html=True)
-                
-                competitors_scraped.append(scraped_data)
-                progress_bar.progress(35 + (i + 1) * 20)
+                    # Estrae titoli dal contenuto se possibile
+                    headings = []
+                    lines = content.split('\n')
+                    for line in lines:
+                        line = line.strip()
+                        # Cerca pattern di titoli
+                        if (line.isupper() and len(line) > 10) or \
+                           (line.startswith(('1.', '2.', '3.', '4.', '5.', '•', '-')) and len(line) > 15) or \
+                           (len(line) < 100 and line.endswith((':', '?')) and len(line) > 10):
+                            headings.append(line)
+                    
+                    processed_data = {
+                        'url': comp_data['url'],
+                        'title': comp_data['manual_title'] or f"Competitor {comp_data['competitor_number']}",
+                        'meta_description': comp_data['manual_meta'],
+                        'meta_keywords': "",
+                        'headings': '\n'.join(headings[:15]),  # Primi 15 possibili titoli
+                        'content': content,
+                        'paragraphs': content.split('\n\n')[:10],  # Primi 10 paragrafi
+                        'lists': [],
+                        'word_count': word_count,
+                        'status': 'manual',
+                        'competitor_number': comp_data['competitor_number']
+                    }
+                    competitors_processed.append(processed_data)
             
-            # Verifica competitor validi
-            valid_competitors = [c for c in competitors_scraped if c['status'] in ['success', 'manual']]
-            if not valid_competitors:
-                st.error("❌ Nessun competitor analizzato con successo. Riprova con contenuto manuale.")
-                return
+            valid_competitors = competitors_processed
+            progress_bar.progress(75)
             
             # Step 4: Preparazione dati
             st.info("📊 Preparazione dati per analisi E-E-A-T...")
@@ -912,9 +1339,9 @@ def main():
         # Mostra risultati
         st.markdown('<h2 class="section-header">📋 Content brief SEO data-driven generato</h2>', unsafe_allow_html=True)
         
-        # Dati SEO summary
+        # Dati SEO summary avanzati
         if keyword_analysis.get('semrush_data') or keyword_analysis.get('serper_data'):
-            st.markdown('<h3 class="section-header">📊 Dati SEO reali utilizzati</h3>', unsafe_allow_html=True)
+            st.markdown('<h3 class="section-header">📊 Dati SEO reali utilizzati - Analisi avanzata</h3>', unsafe_allow_html=True)
             
             col1, col2 = st.columns(2)
             
@@ -926,8 +1353,14 @@ def main():
                     st.write(f"• CPC: €{semrush['cpc']:.2f}")
                     st.write(f"• Competition: {semrush['competition']:.2f}/1.0")
                     
+                    intent_level = 'Transactional' if semrush['cpc'] > 2 else 'Commercial' if semrush['cpc'] > 1 else 'Informational'
+                    st.write(f"• Intent primario: {intent_level}")
+                    
                     if keyword_analysis.get('related_keywords'):
-                        st.write(f"• {len(keyword_analysis['related_keywords'])} keyword correlate trovate")
+                        st.write(f"• {len(keyword_analysis['related_keywords'])} keyword correlate")
+                    
+                    if keyword_analysis.get('topic_clusters'):
+                        st.write(f"• {len(keyword_analysis['topic_clusters'])} cluster tematici")
             
             with col2:
                 if keyword_analysis.get('serper_data', {}).get('status') == 'success':
@@ -938,13 +1371,45 @@ def main():
                     if serper.get('related_searches'):
                         st.write(f"• {len(serper['related_searches'])} ricerche correlate")
                     if serper.get('featured_snippet'):
-                        st.write("• Featured snippet attuale analizzato")
+                        snippet_analysis = serper.get('snippet_analysis', {})
+                        st.write("• Featured snippet analizzato:")
+                        st.write(f"  - Tipo: {snippet_analysis.get('structure_type', 'paragraph')}")
+                        st.write(f"  - Lunghezza: {snippet_analysis.get('word_count', 0)} parole")
+                    
+                    # Mostra distribuzione intent PAA
+                    if serper.get('paa_intents'):
+                        paa_intents = serper['paa_intents']
+                        intent_counts = {k: len(v) for k, v in paa_intents.items() if v}
+                        if intent_counts:
+                            st.write(f"• PAA per intent: {intent_counts}")
             
-            # Preview PAA
-            if keyword_analysis.get('serper_data', {}).get('people_also_ask'):
-                with st.expander("❓ People Also Ask da Google"):
-                    for paa in keyword_analysis['serper_data']['people_also_ask']:
-                        st.write(f"• {paa}")
+            # Preview cluster tematici
+            if keyword_analysis.get('topic_clusters'):
+                with st.expander("🎯 Cluster tematici identificati"):
+                    sorted_clusters = sorted(keyword_analysis['topic_clusters'].items(), 
+                                           key=lambda x: x[1]['total_volume'], reverse=True)
+                    for cluster_name, cluster_data in sorted_clusters[:5]:
+                        st.write(f"**{cluster_name.title()}**: {cluster_data['total_volume']:,} volume totale, {len(cluster_data['keywords'])} keyword")
+            
+            # Preview intent distribution
+            if keyword_analysis.get('intent_categories'):
+                with st.expander("🎭 Distribuzione keyword per intent"):
+                    for intent, keywords in keyword_analysis['intent_categories'].items():
+                        if keywords:
+                            st.write(f"**{intent.title()}** ({len(keywords)} keyword):")
+                            top_kws = sorted(keywords, key=lambda x: x['search_volume'], reverse=True)[:3]
+                            for kw in top_kws:
+                                st.write(f"  • {kw['keyword']} ({kw['search_volume']:,} vol.)")
+            
+            # Preview PAA classificate
+            if keyword_analysis.get('serper_data', {}).get('paa_intents'):
+                with st.expander("❓ People Also Ask classificate per intent"):
+                    paa_intents = keyword_analysis['serper_data']['paa_intents']
+                    for intent, questions in paa_intents.items():
+                        if questions:
+                            st.write(f"**{intent.title()}**:")
+                            for q in questions[:3]:
+                                st.write(f"  • {q}")
         
         # Preview del contenuto
         with st.expander("👁️ Anteprima content brief", expanded=True):
@@ -969,25 +1434,38 @@ def main():
             st.metric("🔗 URL interne trovate", len(sitemap_urls))
         with col3:
             paa_count = len(keyword_analysis.get('serper_data', {}).get('people_also_ask', []))
-            st.metric("❓ PAA da Google", paa_count)
+            st.metric("❓ PAA analizzate", paa_count)
         with col4:
+            cluster_count = len(keyword_analysis.get('topic_clusters', {}))
+            st.metric("🎯 Topic cluster", cluster_count)
+        
+        # Metriche aggiuntive
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
             kw_count = len(keyword_analysis.get('related_keywords', []))
-            st.metric("🎯 Keyword correlate", kw_count)
+            st.metric("📈 Keyword correlate", kw_count)
+        with col2:
+            total_volume = sum(kw['search_volume'] for kw in keyword_analysis.get('related_keywords', []))
+            st.metric("📊 Volume totale", f"{total_volume:,}")
+        with col3:
+            avg_competition = sum(kw['competition'] for kw in keyword_analysis.get('related_keywords', [])) / len(keyword_analysis.get('related_keywords', [])) if keyword_analysis.get('related_keywords') else 0
+            st.metric("⚔️ Competition media", f"{avg_competition:.2f}")
+        with col4:
+            intent_types = len([k for k, v in keyword_analysis.get('intent_categories', {}).items() if v])
+            st.metric("🎭 Intent types", intent_types)
         
         # Dettagli competitor
         with st.expander("🔍 Dettagli analisi competitor"):
-            for i, comp in enumerate(valid_competitors, 1):
-                st.markdown(f"**Competitor {i}:** {comp['url']}")
-                if comp['status'] == 'success':
-                    st.write(f"✅ Scraping automatico riuscito")
+            for comp in valid_competitors:
+                st.markdown(f"**Competitor {comp['competitor_number']}:** {comp['url']}")
+                st.write(f"📝 Contenuto inserito manualmente")
+                if comp['title'] != f"Competitor {comp['competitor_number']}":
                     st.write(f"Titolo: {comp['title']}")
+                if comp['meta_description']:
                     st.write(f"Meta Description: {comp['meta_description']}")
-                    st.write(f"Numero parole: {comp['word_count']}")
-                elif comp['status'] == 'manual':
-                    st.write(f"📝 Contenuto inserito manualmente")
-                    st.write(f"Numero parole: {comp['word_count']}")
-                else:
-                    st.write(f"❌ Errore: {comp.get('error', 'Sconosciuto')}")
+                st.write(f"Numero parole: {comp['word_count']}")
+                if comp['headings']:
+                    st.write(f"Strutture trovate: {len(comp['headings'].split())}")
                 st.markdown("---")
         
         # Enhanced E-E-A-T checklist
