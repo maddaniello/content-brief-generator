@@ -1104,8 +1104,7 @@ def main():
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #666;'>
-        <p>🔗 URL Migration Mapper | Sviluppato per ottimizzare le migrazioni SEO</p>
-        <p>💡 <strong>Funzionalità principali:</strong> Matching intelligente, Colonne personalizzabili, AI Enhancement, Output completo</p>
+        <p>SEO URL Matcher - Risparmia tempo sulle tue migrazioni - Sviluppato da Daniele Pisciottano e il suo amico Claude 🦕</p>
     </div>
     """, unsafe_allow_html=True)
 
