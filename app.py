@@ -12,11 +12,12 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 import io
 import time
+import json
 from typing import List, Dict, Optional
 
 # Configurazione della pagina
 st.set_page_config(
-    page_title="Content Brief Generator",
+    page_title="Content Brief Generator Pro",
     page_icon="📝",
     layout="wide"
 )
@@ -56,12 +57,178 @@ st.markdown("""
         border-left: 4px solid #dc3545;
         margin: 1rem 0;
     }
+    .success-box {
+        background-color: #d4edda;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #28a745;
+        margin: 1rem 0;
+    }
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        color: white;
+        text-align: center;
+        margin: 0.5rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
+class SEODataEnhancer:
+    def __init__(self, semrush_api_key: str = None, serper_api_key: str = None):
+        self.semrush_api_key = semrush_api_key
+        self.serper_api_key = serper_api_key
+        
+    def get_semrush_keyword_data(self, keyword: str, country: str = "IT") -> Dict:
+        """Ottiene dati dalle API di SEMrush per una keyword"""
+        if not self.semrush_api_key:
+            return {'status': 'error', 'message': 'SEMrush API key non configurata'}
+        
+        try:
+            # API SEMrush per keyword overview
+            url = "https://api.semrush.com/"
+            params = {
+                'type': 'phrase_organic',
+                'key': self.semrush_api_key,
+                'phrase': keyword,
+                'database': country.lower(),
+                'export_columns': 'Ph,Nq,Cp,Co,Nr,Td'
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            # Parsing dei risultati SEMrush
+            lines = response.text.strip().split('\n')
+            if len(lines) > 1:
+                data = lines[1].split(';')
+                return {
+                    'status': 'success',
+                    'keyword': data[0] if len(data) > 0 else keyword,
+                    'search_volume': int(data[1]) if len(data) > 1 and data[1].isdigit() else 0,
+                    'cpc': float(data[2]) if len(data) > 2 and data[2].replace('.', '').isdigit() else 0,
+                    'competition': float(data[3]) if len(data) > 3 and data[3].replace('.', '').isdigit() else 0,
+                    'results_count': int(data[4]) if len(data) > 4 and data[4].isdigit() else 0,
+                    'trend': data[5] if len(data) > 5 else ''
+                }
+            else:
+                return {'status': 'no_data', 'keyword': keyword}
+                
+        except Exception as e:
+            return {'status': 'error', 'keyword': keyword, 'error': str(e)}
+    
+    def get_semrush_related_keywords(self, keyword: str, country: str = "IT", limit: int = 20) -> List[Dict]:
+        """Ottiene keyword correlate da SEMrush"""
+        if not self.semrush_api_key:
+            return []
+        
+        try:
+            url = "https://api.semrush.com/"
+            params = {
+                'type': 'phrase_related',
+                'key': self.semrush_api_key,
+                'phrase': keyword,
+                'database': country.lower(),
+                'export_columns': 'Ph,Nq,Cp,Co',
+                'display_limit': limit
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            lines = response.text.strip().split('\n')
+            related_keywords = []
+            
+            for line in lines[1:]:  # Skip header
+                data = line.split(';')
+                if len(data) >= 4:
+                    related_keywords.append({
+                        'keyword': data[0],
+                        'search_volume': int(data[1]) if data[1].isdigit() else 0,
+                        'cpc': float(data[2]) if data[2].replace('.', '').isdigit() else 0,
+                        'competition': float(data[3]) if data[3].replace('.', '').isdigit() else 0
+                    })
+            
+            return related_keywords
+            
+        except Exception as e:
+            st.warning(f"Errore nell'ottenimento keyword correlate SEMrush: {str(e)}")
+            return []
+    
+    def get_serper_search_data(self, query: str, country: str = "it") -> Dict:
+        """Ottiene dati SERP da Serper API"""
+        if not self.serper_api_key:
+            return {'status': 'error', 'message': 'Serper API key non configurata'}
+        
+        try:
+            url = "https://google.serper.dev/search"
+            payload = {
+                'q': query,
+                'gl': country,
+                'hl': 'it',
+                'num': 10
+            }
+            headers = {
+                'X-API-KEY': self.serper_api_key,
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Estrae People Also Ask
+            people_also_ask = []
+            if 'peopleAlsoAsk' in data:
+                for paa in data['peopleAlsoAsk']:
+                    people_also_ask.append(paa.get('question', ''))
+            
+            # Estrae Related Searches
+            related_searches = []
+            if 'relatedSearches' in data:
+                for rs in data['relatedSearches']:
+                    related_searches.append(rs.get('query', ''))
+            
+            # Estrae Featured Snippet
+            featured_snippet = None
+            if 'answerBox' in data:
+                featured_snippet = {
+                    'snippet': data['answerBox'].get('snippet', ''),
+                    'title': data['answerBox'].get('title', ''),
+                    'link': data['answerBox'].get('link', '')
+                }
+            
+            # Estrae top 10 risultati organici
+            organic_results = []
+            if 'organic' in data:
+                for result in data['organic'][:10]:
+                    organic_results.append({
+                        'position': result.get('position', 0),
+                        'title': result.get('title', ''),
+                        'link': result.get('link', ''),
+                        'snippet': result.get('snippet', ''),
+                        'domain': urlparse(result.get('link', '')).netloc
+                    })
+            
+            return {
+                'status': 'success',
+                'query': query,
+                'people_also_ask': people_also_ask,
+                'related_searches': related_searches,
+                'featured_snippet': featured_snippet,
+                'organic_results': organic_results,
+                'total_results': data.get('searchInformation', {}).get('totalResults', 0)
+            }
+            
+        except Exception as e:
+            return {'status': 'error', 'query': query, 'error': str(e)}
+
 class ContentBriefGenerator:
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, seo_enhancer: SEODataEnhancer = None):
         self.client = openai.OpenAI(api_key=api_key)
+        self.seo_enhancer = seo_enhancer or SEODataEnhancer()
         
     def scrape_url(self, url: str) -> Dict[str, str]:
         """Scraping completo di una pagina web per estrarre tutti i contenuti rilevanti"""
@@ -105,14 +272,11 @@ class ContentBriefGenerator:
                     headings.append(f"H{i}: {heading.get_text().strip()}")
             
             # Estrae tutto il contenuto testuale
-            # Prima rimuove elementi non necessari
             for unwanted in soup.find_all(['button', 'form', 'input', 'select', 'textarea']):
                 unwanted.decompose()
             
             # Estrae il contenuto principale
             main_content = ""
-            
-            # Cerca il contenuto principale in vari modi
             main_selectors = [
                 'main', 'article', '[role="main"]', 
                 '.content', '.main-content', '.post-content',
@@ -125,7 +289,6 @@ class ContentBriefGenerator:
                     main_content = main_element.get_text()
                     break
             
-            # Se non trova un contenitore principale, prende tutto il body
             if not main_content:
                 body = soup.find('body')
                 if body:
@@ -133,14 +296,13 @@ class ContentBriefGenerator:
                 else:
                     main_content = soup.get_text()
             
-            # Pulisce il contenuto
             main_content = re.sub(r'\s+', ' ', main_content).strip()
             
             # Estrae paragrafi strutturati
             paragraphs = []
             for p in soup.find_all('p'):
                 p_text = p.get_text().strip()
-                if len(p_text) > 50:  # Solo paragrafi significativi
+                if len(p_text) > 50:
                     paragraphs.append(p_text)
             
             # Estrae liste
@@ -157,8 +319,8 @@ class ContentBriefGenerator:
                 'meta_keywords': meta_keywords_text,
                 'headings': '\n'.join(headings),
                 'content': main_content,
-                'paragraphs': paragraphs[:10],  # Primi 10 paragrafi
-                'lists': lists[:5],  # Prime 5 liste
+                'paragraphs': paragraphs[:10],
+                'lists': lists[:5],
                 'word_count': len(main_content.split()),
                 'status': 'success'
             }
@@ -195,34 +357,27 @@ class ContentBriefGenerator:
                 response = requests.get(url, headers=headers, timeout=15)
                 response.raise_for_status()
                 
-                # Prova a parsare come XML
                 root = ET.fromstring(response.content)
-                
-                # Namespace per sitemap
                 namespaces = {
                     'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9',
                     'sitemap': 'http://www.sitemaps.org/schemas/sitemap/0.9'
                 }
                 
-                # Controlla se è un indice di sitemap
                 sitemapindex = root.findall('.//ns:sitemap', namespaces)
                 if sitemapindex:
-                    # È un indice di sitemap, processa ogni sitemap
-                    for sitemap in sitemapindex[:10]:  # Limita a 10 sitemap
+                    for sitemap in sitemapindex[:10]:
                         loc_elem = sitemap.find('ns:loc', namespaces)
                         if loc_elem is not None:
                             process_sitemap(loc_elem.text)
                 else:
-                    # È una sitemap normale, estrae le URL
                     for url_elem in root.findall('.//ns:url', namespaces):
                         loc_elem = url_elem.find('ns:loc', namespaces)
                         if loc_elem is not None:
                             urls.append(loc_elem.text)
-                            if len(urls) >= 100:  # Limita a 100 URL totali
+                            if len(urls) >= 100:
                                 break
                 
             except ET.ParseError:
-                # Se non è XML valido, prova a cercare URL nel testo
                 try:
                     response = requests.get(url, headers=headers, timeout=15)
                     text = response.text
@@ -237,14 +392,40 @@ class ContentBriefGenerator:
         
         try:
             process_sitemap(sitemap_url)
-            return list(set(urls))  # Rimuove duplicati
-            
+            return list(set(urls))
         except Exception as e:
             st.error(f"Errore critico nell'estrazione della sitemap: {str(e)}")
             return []
     
-    def generate_content_brief(self, data: Dict) -> str:
-        """Genera il content brief usando OpenAI con focus su E-E-A-T"""
+    def analyze_keywords_with_apis(self, keywords: str) -> Dict:
+        """Analizza le keyword usando SEMrush e Serper"""
+        keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
+        main_keyword = keyword_list[0] if keyword_list else ""
+        
+        # Dati SEMrush
+        semrush_data = {}
+        related_keywords = []
+        
+        if main_keyword:
+            semrush_data = self.seo_enhancer.get_semrush_keyword_data(main_keyword)
+            if semrush_data.get('status') == 'success':
+                related_keywords = self.seo_enhancer.get_semrush_related_keywords(main_keyword)
+        
+        # Dati Serper
+        serper_data = {}
+        if main_keyword:
+            serper_data = self.seo_enhancer.get_serper_search_data(main_keyword)
+        
+        return {
+            'main_keyword': main_keyword,
+            'all_keywords': keyword_list,
+            'semrush_data': semrush_data,
+            'related_keywords': related_keywords,
+            'serper_data': serper_data
+        }
+    
+    def generate_content_brief(self, data: Dict, keyword_analysis: Dict) -> str:
+        """Genera il content brief usando OpenAI con dati SEO reali"""
         
         # Prepara i dati dei competitor
         competitor_data = ""
@@ -261,19 +442,64 @@ class ContentBriefGenerator:
             else:
                 competitor_data += f"Contenuto manuale: {comp.get('manual_content', 'Non disponibile')}\n"
         
-        # Prepara le URL interne per i link
+        # Prepara dati SEMrush
+        semrush_info = ""
+        if keyword_analysis['semrush_data'].get('status') == 'success':
+            sd = keyword_analysis['semrush_data']
+            semrush_info = f"""
+DATI SEMRUSH KEYWORD PRINCIPALE "{keyword_analysis['main_keyword']}":
+- Volume di ricerca mensile: {sd.get('search_volume', 'N/A')}
+- CPC: €{sd.get('cpc', 'N/A')}
+- Competizione: {sd.get('competition', 'N/A')}/1.0
+- Risultati totali: {sd.get('results_count', 'N/A')}
+"""
+        
+        # Prepara keyword correlate
+        related_kw = ""
+        if keyword_analysis['related_keywords']:
+            related_kw = "KEYWORD CORRELATE DA SEMRUSH:\n"
+            for kw in keyword_analysis['related_keywords'][:10]:
+                related_kw += f"- {kw['keyword']} (Vol: {kw['search_volume']}, Comp: {kw['competition']})\n"
+        
+        # Prepara dati Serper
+        serper_info = ""
+        if keyword_analysis['serper_data'].get('status') == 'success':
+            sd = keyword_analysis['serper_data']
+            
+            if sd.get('people_also_ask'):
+                serper_info += "PEOPLE ALSO ASK DA GOOGLE:\n"
+                for paa in sd['people_also_ask'][:8]:
+                    serper_info += f"- {paa}\n"
+            
+            if sd.get('related_searches'):
+                serper_info += "\nRICERCHE CORRELATE DA GOOGLE:\n"
+                for rs in sd['related_searches'][:5]:
+                    serper_info += f"- {rs}\n"
+            
+            if sd.get('featured_snippet'):
+                serper_info += f"\nFEATURED SNIPPET ATTUALE:\n"
+                serper_info += f"Titolo: {sd['featured_snippet']['title']}\n"
+                serper_info += f"Snippet: {sd['featured_snippet']['snippet'][:200]}...\n"
+        
+        # Prepara le URL interne
         internal_urls = "\n".join(data['sitemap_urls'][:30]) if data['sitemap_urls'] else data.get('manual_urls', 'Nessuna URL interna disponibile')
         
         prompt = f"""
-Sei un esperto SEO copywriter e content strategist specializzato in E-E-A-T (Experience, Expertise, Authoritativeness, Trustworthiness). Devi creare un content brief, una scaletta dettagliata per un articolo ottimizzato SEO che raggiunga il massimo punteggio E-E-A-T.
+Sei un esperto SEO copywriter e content strategist specializzato in E-E-A-T (Experience, Expertise, Authoritativeness, Trustworthiness). Devi creare un content brief dettagliato basato su DATI SEO REALI per un articolo che raggiunga il massimo punteggio E-E-A-T e batta la concorrenza.
 
 INFORMAZIONI CLIENTE:
 - Brand: {data['brand']}
 - Sito web: {data['website']}
 - Argomento: {data['topic']}
 - Keyword principali: {data['keywords']}
-- Domande frequenti (PAA): {data['faqs']}
+- Domande frequenti inserite: {data['faqs']}
 - Tone of voice: {', '.join(data['tone_of_voice'])}
+
+{semrush_info}
+
+{related_kw}
+
+{serper_info}
 
 ANALISI COMPETITOR:
 {competitor_data}
@@ -285,89 +511,87 @@ IMPORTANTE:
 - Il brand "{data['brand']}" DEVE apparire nel meta title alla fine
 - Il brand "{data['brand']}" DEVE apparire nella meta description
 - Usa la capitalizzazione naturale italiana (solo prima parola maiuscola, nomi propri maiuscoli)
-- Esempio CORRETTO: "Come ottenere il mutuo prima casa"
-- Esempio SBAGLIATO: "Come Ottenere Il Mutuo Prima Casa"
+- Utilizza i dati REALI di volumi di ricerca e People Also Ask per ottimizzare il contenuto
+- Considera le keyword correlate di SEMrush per arricchire il contenuto
+- Analizza il featured snippet esistente per superarlo
 
 Genera un content brief completo che includa:
 
-1. **ANALISI INTENTO DI RICERCA E OBIETTIVO**
-   - Esamina e approfondisci l'intento delle keyword principali individuate, inclusi i motivi per cui le persone cercano queste informazioni.
-   - Definisci con precisione l'obiettivo dell'articolo e il pubblico target,
-   - Crea una strategia per battere i competitor in merito alle informazioni raccolte sui loro siti individuando cosa potrebbe essere fatto meglio e cosa manca.
+1. **ANALISI INTENTO DI RICERCA E OBIETTIVO BASATA SU DATI REALI**
+   - Analizza l'intento basandoti sui dati di volume SEMrush e le PAA di Google
+   - Definisci l'obiettivo considerando la competizione reale (CPC e competition score)
+   - Strategia per battere i competitor analizzando featured snippet e top 10
 
-2. **LINEE GUIDA SEO E STILE**
-   - Fornisci dettagli in merito alle modalità di utilizzo delle keyword, inclusi densità e posizionamento strategico all'interno del testo.
-   - Specifica in dettaglio il tone of voice e lo stile di scrittura richiesto, nonché la lunghezza ideale del contenuto, supportata da un'analisi approfondita dei competitor per garantire il massimo impatto.
+2. **LINEE GUIDA SEO E STILE CON KEYWORD DATA-DRIVEN**
+   - Utilizza keyword correlate di SEMrush per densità e posizionamento
+   - Incorpora naturalmente le ricerche correlate di Google
+   - Stile basato sui volumi di ricerca e competizione
+   - Lunghezza ottimale basata sull'analisi competitor
 
-3. **META TITLE E DESCRIPTION**
-   - Fornisci un meta title ottimizzato (50-60 caratteri) e una meta description (150-160 caratteri) che evidenzino il brand e incorporino le keyword strategiche.
-   - Usa capitalizzazione naturale italiana
+3. **META TITLE E DESCRIPTION OTTIMIZZATE**
+   - Meta title (50-60 caratteri) con keyword principale e brand
+   - Meta description (150-160 caratteri) che incorpori PAA e brand
+   - Capitalizzazione naturale italiana
 
-4. **STRATEGIA E-E-A-T**
-   Per ogni sezione, specifica come implementare:
+4. **STRATEGIA E-E-A-T POTENZIATA CON DATI REALI**
    
-   **EXPERIENCE (Esperienza):**
-   - Esempi pratici diversificati da includere
-   - Casi studio del mondo reale
-   - Scenari applicabili in diversi contesti
-   - Testimonianze o esperienze dirette
+   **EXPERIENCE:** 
+   - Esempi basati su ricerche correlate reali di Google
+   - Casi studio che rispondano alle PAA
    
-   **EXPERTISE (Competenza):**
-   - Insight originali da inserire
-   - Dati e statistiche approfondite
-   - Analisi tecniche dettagliate
-   - Ricerche originali o citazioni di studi
+   **EXPERTISE:**
+   - Dati statistici reali (volume ricerche, trend del settore)
+   - Insight basati sui gap nei competitor
    
-   **AUTHORITATIVENESS (Autorevolezza):**
-   - Fonti autorevoli da citare (istituzioni, enti, studi)
-   - Link a ricerche accademiche
-   - Riferimenti a normative e leggi
-   - Citazioni di esperti del settore
+   **AUTHORITATIVENESS:**
+   - Fonti che i competitor non citano
+   - Opportunità di superare il featured snippet attuale
    
-   **TRUSTWORTHINESS (Affidabilità):**
-   - Trasparenza su limiti e conflitti di interesse
-   - Dati aziendali da includere se pertinenti
-   - Approccio obiettivo e bilanciato
-   - Disclaimers necessari
+   **TRUSTWORTHINESS:**
+   - Trasparenza su dati e fonti reali
+   - Riconoscimento dei limiti dove competitors falliscono
 
-5. **STRUTTURA CONTENUTO DETTAGLIATA**
-   Per ogni sezione specifica (usa capitalizzazione naturale):
-   - H1 principale ottimizzato
-   - Descrizione di cosa dovrebbe contenere l'introduzione dopo l'H1
-   - H2 e H3 con descrizione dettagliata del contenuto tramite più di un elenco puntato che spieghino gli argomenti principali da trattare all'interno del paragrafo. Ad esempio questo contenuto funziona: 'Spiegazione dei requisiti generali per richiedere un mutuo senza garanzie (ad esempio, buona situazione creditizia, pagamento regolare delle bollette, ecc.).
-Alternativa: come presentare un garante per aumentare le possibilità di approvazione.
-Dettaglio del processo di richiesta: documenti richiesti, possibili difficoltà, e soluzioni alternative.
-Utilizza parole chiave come “mutuo senza busta paga”, “documentazione richiesta”, “mutuo senza reddito”.' Dai informazioni precise e dettagliate in merito all'argomento di quel paragrafo.
-   - Parole chiave utili da includere in ogni sezione e domande a cui rispondere
-   - Elementi E-E-A-T specifici per ogni paragrafo
-   - Link interni suggeriti con anchor text naturali
-   - Suggerimenti su presenza di elementi aggiuntivi come immagini, infografiche, fonti, dati, all'interno dei paragrafi dove potrebbe essere utile
+5. **STRUTTURA CONTENUTO OTTIMIZZATA PER GOOGLE**
+   - H1 ottimizzato per keyword principale
+   - H2/H3 che rispondono alle People Also Ask
+   - Sezioni per keyword correlate ad alto volume
+   - Strategia per conquistare featured snippet
+   - Risposte specifiche alle PAA di Google nel contenuto
 
-6. **LINK INTERNI STRATEGICI**
-   - Elenco dettagliato di link interni da inserire, pertinenti e collegati al contenuto dell'articolo
-   - Anchor text naturali e pertinenti
-   - Posizionamento strategico nel contenuto
-   - Valore aggiunto per l'utente
+6. **INTEGRAZIONE PEOPLE ALSO ASK**
+   Per ogni PAA di Google:
+   - Dove inserirla nella struttura
+   - Come rispondere meglio dei competitor
+   - Keyword correlate da usare nella risposta
 
-7. **FONTI E CREDIBILITÀ**
-   - Lista di fonti autorevoli da consultare e citare
-   - Studi e ricerche da referenziare
-   - Enti e istituzioni da menzionare
-   - Dati statistici recenti da includere
+7. **KEYWORD CORRELATE E SEMANTICHE**
+   - Come integrare keyword correlate SEMrush
+   - Ricerche correlate Google da includere
+   - Densità ottimale basata su competition score
 
-8. **CALL TO ACTION E CONVERSIONE**
-   - CTA strategiche da inserire nel contenuto
-   - CTA finale di conversione ottimizzata
-   - Micro-conversioni intermedie
+8. **LINK INTERNI STRATEGICI DATA-DRIVEN**
+   - Link basati su analisi del traffico potenziale
+   - Anchor text con keyword correlate
+   - Distribuzione strategica per topic clustering
 
-Analizza i competitor per identificare lacune da colmare e opportunità per creare contenuto superiore. Fornisci indicazioni specifiche, actionable e orientate al massimo punteggio E-E-A-T.
+9. **FONTI E CREDIBILITÀ SUPERIORI AI COMPETITOR**
+   - Fonti che mancano nei competitor top 10
+   - Dati più recenti di quelli usati dai competitor
+   - Authority sources che aumentano E-E-A-T
+
+10. **CALL TO ACTION OTTIMIZZATE PER CONVERSIONE**
+    - CTA basate sull'intento di ricerca reale
+    - Micro-conversioni intermediate per high-competition keyword
+    - CTA finali ottimizzate per volume/valore keyword
+
+Utilizza ESCLUSIVAMENTE i dati reali forniti (volumi SEMrush, PAA Google, ricerche correlate) per creare una strategia superiore ai competitor. Focus su superare il featured snippet attuale e rispondere meglio alle PAA.
 """
 
         try:
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "Sei un esperto SEO content strategist specializzato in E-E-A-T che crea content brief dettagliati, ottimizzati e superiori alla concorrenza."},
+                    {"role": "system", "content": "Sei un esperto SEO content strategist che utilizza dati reali di SEMrush e Serper per creare content brief superiori alla concorrenza, ottimizzati per E-E-A-T e ranking Google."},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=4000,
@@ -393,11 +617,11 @@ def create_docx(content: str, brand: str, topic: str) -> io.BytesIO:
         section.right_margin = Inches(1)
     
     # Titolo principale
-    title = doc.add_heading(f'Content brief - {topic}', 0)
+    title = doc.add_heading(f'Content brief SEO data-driven - {topic}', 0)
     title_format = title.runs[0].font
     title_format.name = 'Figtree'
     title_format.size = Pt(20)
-    title_format.color.rgb = None  # Nero
+    title_format.color.rgb = None
     
     # Sottotitolo
     subtitle = doc.add_paragraph(f'Brand: {brand}')
@@ -406,7 +630,7 @@ def create_docx(content: str, brand: str, topic: str) -> io.BytesIO:
     subtitle_format.size = Pt(12)
     subtitle_format.bold = True
     
-    doc.add_paragraph("")  # Spazio
+    doc.add_paragraph("")
     
     # Processa il contenuto
     lines = content.split('\n')
@@ -416,7 +640,6 @@ def create_docx(content: str, brand: str, topic: str) -> io.BytesIO:
         if not line:
             continue
             
-        # Gestisce i titoli
         if line.startswith('# '):
             heading = doc.add_heading(line[2:], 1)
             heading_format = heading.runs[0].font
@@ -436,7 +659,6 @@ def create_docx(content: str, brand: str, topic: str) -> io.BytesIO:
             heading_format.size = Pt(17)
             
         elif line.startswith('**') and line.endswith('**'):
-            # Testo in grassetto
             p = doc.add_paragraph()
             run = p.add_run(line[2:-2])
             run.font.name = 'Figtree'
@@ -444,13 +666,11 @@ def create_docx(content: str, brand: str, topic: str) -> io.BytesIO:
             run.font.bold = True
             
         elif line.startswith('- ') or line.startswith('* '):
-            # Lista puntata
             p = doc.add_paragraph(line[2:], style='List Bullet')
             p.runs[0].font.name = 'Figtree'
             p.runs[0].font.size = Pt(11)
             
         else:
-            # Testo normale
             if line:
                 p = doc.add_paragraph(line)
                 p.runs[0].font.name = 'Figtree'
@@ -465,28 +685,50 @@ def create_docx(content: str, brand: str, topic: str) -> io.BytesIO:
 
 def main():
     st.markdown('<h1 class="main-header">📝 Content Brief Generator Pro</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; color: #666;">Genera content brief ottimizzati E-E-A-T con analisi competitor avanzata</p>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; color: #666;">Genera content brief con dati SEO reali da SEMrush e Serper</p>', unsafe_allow_html=True)
     
-    # Sidebar per API Key
+    # Sidebar per API Keys
     with st.sidebar:
-        st.markdown("### 🔑 Configurazione")
-        api_key = st.text_input("OpenAI API Key", type="password", help="Inserisci la tua API key di OpenAI")
+        st.markdown("### 🔑 Configurazione API")
         
-        if api_key:
-            st.success("✅ API Key configurata")
+        # OpenAI API Key
+        openai_api_key = st.text_input("OpenAI API Key", type="password", help="Inserisci la tua API key di OpenAI")
+        
+        # SEMrush API Key
+        st.markdown("---")
+        st.markdown("#### 📊 SEMrush (Opzionale)")
+        semrush_api_key = st.text_input("SEMrush API Key", type="password", help="Per dati keyword reali, volumi di ricerca e keyword correlate")
+        if semrush_api_key:
+            st.success("✅ SEMrush configurato")
         else:
-            st.warning("⚠️ Inserisci la tua API Key per continuare")
+            st.info("💡 Aggiungi per dati keyword reali")
+        
+        # Serper API Key
+        st.markdown("#### 🔍 Serper (Opzionale)")
+        serper_api_key = st.text_input("Serper API Key", type="password", help="Per People Also Ask e analisi SERP in tempo reale")
+        if serper_api_key:
+            st.success("✅ Serper configurato")
+        else:
+            st.info("💡 Aggiungi per PAA da Google")
         
         st.markdown("---")
-        st.markdown("### 📊 E-E-A-T Focus")
-        st.info("Questo tool è ottimizzato per creare content brief che massimizzano il punteggio E-E-A-T di Google")
+        st.markdown("### 🚀 Miglioramenti")
+        st.markdown("""
+        **Con SEMrush + Serper:**
+        - 📈 Volumi di ricerca reali
+        - 🎯 Keyword correlate precise
+        - ❓ People Also Ask live
+        - 🏆 Featured snippet analysis
+        - 📊 Competition data
+        """)
     
-    if not api_key:
-        st.info("👈 Inserisci la tua OpenAI API Key nella sidebar per iniziare")
+    if not openai_api_key:
+        st.info("👈 Inserisci almeno la OpenAI API Key nella sidebar per iniziare")
         return
     
-    # Inizializza il generatore
-    generator = ContentBriefGenerator(api_key)
+    # Inizializza i servizi
+    seo_enhancer = SEODataEnhancer(semrush_api_key, serper_api_key)
+    generator = ContentBriefGenerator(openai_api_key, seo_enhancer)
     
     # Form principale
     with st.form("content_brief_form"):
@@ -501,8 +743,8 @@ def main():
             topic = st.text_area("📝 Argomento del contenuto", placeholder="Descrivi l'argomento principale dell'articolo")
         
         with col2:
-            keywords = st.text_area("🔍 Keyword utili", placeholder="Inserisci le keyword separate da virgola")
-            faqs = st.text_area("❓ Domande frequenti (PAA)", placeholder="Inserisci le domande frequenti, una per riga")
+            keywords = st.text_area("🔍 Keyword utili", placeholder="keyword principale, keyword secondaria, keyword long tail")
+            faqs = st.text_area("❓ Domande frequenti (PAA)", placeholder="Inserisci domande conosciute, verranno integrate con PAA reali da Google se Serper è configurato")
             
             # Tone of voice con multiselect
             tone_options = [
@@ -510,6 +752,15 @@ def main():
                 "Informativo", "Ricercato", "Popolare", "Personalizzato"
             ]
             tone_of_voice = st.multiselect("🎯 Tone of voice", tone_options, default=["Professionale"])
+        
+        # Preview API status
+        if semrush_api_key or serper_api_key:
+            st.markdown('<div class="success-box">🎯 <strong>Modalità Enhanced SEO attiva!</strong> Il content brief includerà dati reali da:', unsafe_allow_html=True)
+            if semrush_api_key:
+                st.markdown("✅ SEMrush: volumi di ricerca, keyword correlate, competition data")
+            if serper_api_key:
+                st.markdown("✅ Serper: People Also Ask live, ricerche correlate, featured snippets")
+            st.markdown('</div>', unsafe_allow_html=True)
         
         # Gestione sitemap alternativa
         st.markdown('<h3 class="section-header">🔗 URL interne (fallback)</h3>', unsafe_allow_html=True)
@@ -542,7 +793,7 @@ def main():
                     'use_manual': use_manual
                 })
         
-        submitted = st.form_submit_button("🚀 Genera content brief E-E-A-T", use_container_width=True)
+        submitted = st.form_submit_button("🚀 Genera content brief con dati SEO reali", use_container_width=True)
     
     if submitted:
         # Validazione input
@@ -554,10 +805,33 @@ def main():
             st.error("❌ Inserisci almeno un URL competitor")
             return
         
-        with st.spinner("🔄 Generazione del content brief E-E-A-T in corso..."):
+        with st.spinner("🔄 Generazione del content brief con dati SEO reali..."):
             progress_bar = st.progress(0)
             
-            # Step 1: Estrazione sitemap
+            # Step 1: Analisi keyword con API
+            if semrush_api_key or serper_api_key:
+                st.info("🔍 Analisi keyword con SEMrush e Serper...")
+                keyword_analysis = generator.analyze_keywords_with_apis(keywords)
+                progress_bar.progress(15)
+                
+                # Mostra preview dati SEO
+                if keyword_analysis['semrush_data'].get('status') == 'success':
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("📈 Volume ricerca", f"{keyword_analysis['semrush_data']['search_volume']:,}")
+                    with col2:
+                        st.metric("💰 CPC", f"€{keyword_analysis['semrush_data']['cpc']:.2f}")
+                    with col3:
+                        st.metric("⚔️ Competition", f"{keyword_analysis['semrush_data']['competition']:.2f}")
+                
+                if keyword_analysis['serper_data'].get('people_also_ask'):
+                    st.success(f"✅ Trovate {len(keyword_analysis['serper_data']['people_also_ask'])} People Also Ask da Google")
+            else:
+                st.info("📊 Analisi keyword base (senza API esterne)...")
+                keyword_analysis = {'main_keyword': keywords.split(',')[0].strip(), 'semrush_data': {}, 'serper_data': {}}
+                progress_bar.progress(15)
+            
+            # Step 2: Estrazione sitemap
             st.info("📡 Estrazione URL dalla sitemap...")
             sitemap_urls = []
             sitemap_error = False
@@ -568,20 +842,18 @@ def main():
                     sitemap_error = True
                     st.warning("⚠️ Impossibile accedere alla sitemap. Utilizzo URL manuali.")
             
-            # Usa URL manuali se sitemap fallisce o se fornite
             if sitemap_error or manual_urls.strip():
                 manual_url_list = [url.strip() for url in manual_urls.split('\n') if url.strip()]
                 sitemap_urls.extend(manual_url_list)
             
-            progress_bar.progress(20)
+            progress_bar.progress(35)
             
-            # Step 2: Scraping competitor
+            # Step 3: Scraping competitor
             st.info("🕷️ Analisi competitor in corso...")
             competitors_scraped = []
             
             for i, comp_data in enumerate(competitor_data):
                 if comp_data['use_manual'] and comp_data['manual_content']:
-                    # Usa contenuto manuale
                     scraped_data = {
                         'url': comp_data['url'],
                         'title': f"Competitor {i+1} (contenuto manuale)",
@@ -595,24 +867,22 @@ def main():
                         'status': 'manual'
                     }
                 else:
-                    # Prova scraping automatico
                     scraped_data = generator.scrape_url(comp_data['url'])
                     
-                    # Se scraping fallisce, chiede contenuto manuale
                     if scraped_data['status'] == 'error':
                         st.error(f"❌ Impossibile accedere a {comp_data['url']}")
                         st.markdown('<div class="error-box">Per continuare, usa l\'opzione "Contenuto manuale" e incolla il testo della pagina</div>', unsafe_allow_html=True)
                 
                 competitors_scraped.append(scraped_data)
-                progress_bar.progress(20 + (i + 1) * 20)
+                progress_bar.progress(35 + (i + 1) * 20)
             
-            # Verifica che almeno un competitor sia stato analizzato
+            # Verifica competitor validi
             valid_competitors = [c for c in competitors_scraped if c['status'] in ['success', 'manual']]
             if not valid_competitors:
                 st.error("❌ Nessun competitor analizzato con successo. Riprova con contenuto manuale.")
                 return
             
-            # Step 3: Preparazione dati
+            # Step 4: Preparazione dati
             st.info("📊 Preparazione dati per analisi E-E-A-T...")
             data = {
                 'brand': brand,
@@ -625,22 +895,56 @@ def main():
                 'sitemap_urls': sitemap_urls,
                 'manual_urls': manual_urls
             }
-            progress_bar.progress(80)
+            progress_bar.progress(85)
             
-            # Step 4: Generazione content brief
-            st.info("🤖 Generazione content brief E-E-A-T con AI...")
-            content_brief = generator.generate_content_brief(data)
-            progress_bar.progress(90)
+            # Step 5: Generazione content brief
+            st.info("🤖 Generazione content brief con AI e dati SEO reali...")
+            content_brief = generator.generate_content_brief(data, keyword_analysis)
+            progress_bar.progress(95)
             
-            # Step 5: Creazione documento
+            # Step 6: Creazione documento
             st.info("📄 Creazione documento DOCX...")
             docx_buffer = create_docx(content_brief, brand, topic)
             progress_bar.progress(100)
             
-            st.success("✅ Content brief E-E-A-T generato con successo!")
+            st.success("✅ Content brief SEO data-driven generato con successo!")
         
         # Mostra risultati
-        st.markdown('<h2 class="section-header">📋 Content brief E-E-A-T generato</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 class="section-header">📋 Content brief SEO data-driven generato</h2>', unsafe_allow_html=True)
+        
+        # Dati SEO summary
+        if keyword_analysis.get('semrush_data') or keyword_analysis.get('serper_data'):
+            st.markdown('<h3 class="section-header">📊 Dati SEO reali utilizzati</h3>', unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if keyword_analysis.get('semrush_data', {}).get('status') == 'success':
+                    st.markdown("**🎯 Dati SEMrush**")
+                    semrush = keyword_analysis['semrush_data']
+                    st.write(f"• Volume: {semrush['search_volume']:,} ricerche/mese")
+                    st.write(f"• CPC: €{semrush['cpc']:.2f}")
+                    st.write(f"• Competition: {semrush['competition']:.2f}/1.0")
+                    
+                    if keyword_analysis.get('related_keywords'):
+                        st.write(f"• {len(keyword_analysis['related_keywords'])} keyword correlate trovate")
+            
+            with col2:
+                if keyword_analysis.get('serper_data', {}).get('status') == 'success':
+                    st.markdown("**🔍 Dati Serper**")
+                    serper = keyword_analysis['serper_data']
+                    if serper.get('people_also_ask'):
+                        st.write(f"• {len(serper['people_also_ask'])} People Also Ask")
+                    if serper.get('related_searches'):
+                        st.write(f"• {len(serper['related_searches'])} ricerche correlate")
+                    if serper.get('featured_snippet'):
+                        st.write("• Featured snippet attuale analizzato")
+            
+            # Preview PAA
+            if keyword_analysis.get('serper_data', {}).get('people_also_ask'):
+                with st.expander("❓ People Also Ask da Google"):
+                    for paa in keyword_analysis['serper_data']['people_also_ask']:
+                        st.write(f"• {paa}")
         
         # Preview del contenuto
         with st.expander("👁️ Anteprima content brief", expanded=True):
@@ -648,15 +952,15 @@ def main():
         
         # Download button
         st.download_button(
-            label="📥 Scarica content brief (DOCX)",
+            label="📥 Scarica content brief SEO data-driven (DOCX)",
             data=docx_buffer.getvalue(),
-            file_name=f"content_brief_EEAT_{brand}_{topic.replace(' ', '_')}.docx",
+            file_name=f"content_brief_SEO_{brand}_{topic.replace(' ', '_')}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True
         )
         
         # Informazioni aggiuntive
-        st.markdown('<h3 class="section-header">📊 Riepilogo analisi</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">📊 Riepilogo analisi completa</h3>', unsafe_allow_html=True)
         
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -664,10 +968,11 @@ def main():
         with col2:
             st.metric("🔗 URL interne trovate", len(sitemap_urls))
         with col3:
-            st.metric("🎯 Tone of voice", len(tone_of_voice))
+            paa_count = len(keyword_analysis.get('serper_data', {}).get('people_also_ask', []))
+            st.metric("❓ PAA da Google", paa_count)
         with col4:
-            total_words = sum([c.get('word_count', 0) for c in valid_competitors])
-            st.metric("📝 Parole analizzate", total_words)
+            kw_count = len(keyword_analysis.get('related_keywords', []))
+            st.metric("🎯 Keyword correlate", kw_count)
         
         # Dettagli competitor
         with st.expander("🔍 Dettagli analisi competitor"):
@@ -685,40 +990,50 @@ def main():
                     st.write(f"❌ Errore: {comp.get('error', 'Sconosciuto')}")
                 st.markdown("---")
         
-        # Consigli E-E-A-T
-        st.markdown('<h3 class="section-header">🏆 Checklist E-E-A-T</h3>', unsafe_allow_html=True)
-        st.markdown('<div class="info-box">Il content brief generato include suggerimenti specifici per massimizzare il punteggio E-E-A-T:</div>', unsafe_allow_html=True)
+        # Enhanced E-E-A-T checklist
+        st.markdown('<h3 class="section-header">🏆 Checklist E-E-A-T Enhanced</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="success-box">Il content brief generato include suggerimenti basati su <strong>dati SEO reali</strong> per massimizzare E-E-A-T:</div>', unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("""
-            **📚 Experience (Esperienza)**
-            - ✅ Esempi pratici diversificati
-            - ✅ Casi studio del mondo reale
-            - ✅ Scenari applicabili
-            - ✅ Testimonianze dirette
+            **📚 Experience (Data-driven)**
+            - ✅ Esempi basati su ricerche correlate reali
+            - ✅ Casi studio che rispondono alle PAA
+            - ✅ Scenari ottimizzati per volumi di ricerca
+            - ✅ Testimonianze mirate al search intent
             
-            **🎓 Expertise (Competenza)**
-            - ✅ Insight originali
-            - ✅ Dati e statistiche approfondite
-            - ✅ Analisi tecniche dettagliate
-            - ✅ Ricerche e citazioni
+            **🎓 Expertise (SEO-optimized)**
+            - ✅ Insight basati su keyword correlate
+            - ✅ Dati statistici reali (volumi, trend)
+            - ✅ Gap analysis vs competitor top 10
+            - ✅ Featured snippet optimization
             """)
         
         with col2:
             st.markdown("""
-            **⭐ Authoritativeness (Autorevolezza)**
-            - ✅ Fonti autorevoli da citare
-            - ✅ Link a ricerche accademiche
-            - ✅ Riferimenti normativi
-            - ✅ Citazioni di esperti
+            **⭐ Authoritativeness (SERP-focused)**
+            - ✅ Fonti che battono competitor attuali
+            - ✅ Strategia per featured snippet
+            - ✅ Authority building per high-volume keywords
+            - ✅ Topical relevance enhancement
             
-            **🛡️ Trustworthiness (Affidabilità)**
-            - ✅ Trasparenza su limiti
-            - ✅ Dati aziendali pertinenti
-            - ✅ Approccio obiettivo
-            - ✅ Disclaimers necessari
+            **🛡️ Trustworthiness (Search-aligned)**
+            - ✅ Trasparenza su dati e metodologie
+            - ✅ Riconoscimento limiti vs competitor
+            - ✅ User intent satisfaction
+            - ✅ Search quality guidelines compliance
             """)
+        
+        # API usage tips
+        if not semrush_api_key or not serper_api_key:
+            st.markdown('<h3 class="section-header">💡 Migliora ulteriormente i risultati</h3>', unsafe_allow_html=True)
+            st.markdown('<div class="info-box">', unsafe_allow_html=True)
+            if not semrush_api_key:
+                st.write("🔹 **Aggiungi SEMrush API** per: volumi di ricerca precisi, keyword difficulty, competitor traffic analysis")
+            if not serper_api_key:
+                st.write("🔹 **Aggiungi Serper API** per: People Also Ask live, featured snippets, real-time SERP data")
+            st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
