@@ -336,7 +336,10 @@ Genera un content brief completo che includa:
    Per ogni sezione specifica (usa capitalizzazione naturale):
    - H1 principale ottimizzato
    - Descrizione di cosa dovrebbe contenere l'introduzione dopo l'H1
-   - H2 e H3 con descrizione dettagliata del contenuto tramite elenchi puntati che spieghino gli argomenti principali da trattare all'interno del paragrafo
+   - H2 e H3 con descrizione dettagliata del contenuto tramite più di un elenco puntato che spieghino gli argomenti principali da trattare all'interno del paragrafo. Ad esempio questo contenuto funziona: 'Spiegazione dei requisiti generali per richiedere un mutuo senza garanzie (ad esempio, buona situazione creditizia, pagamento regolare delle bollette, ecc.).
+Alternativa: come presentare un garante per aumentare le possibilità di approvazione.
+Dettaglio del processo di richiesta: documenti richiesti, possibili difficoltà, e soluzioni alternative.
+Utilizza parole chiave come “mutuo senza busta paga”, “documentazione richiesta”, “mutuo senza reddito”.' Dai informazioni precise e dettagliate in merito all'argomento di quel paragrafo.
    - Parole chiave utili da includere in ogni sezione e domande a cui rispondere
    - Elementi E-E-A-T specifici per ogni paragrafo
    - Link interni suggeriti con anchor text naturali
