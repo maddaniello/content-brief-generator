@@ -343,10 +343,10 @@ Utilizza parole chiave come “mutuo senza busta paga”, “documentazione rich
    - Parole chiave utili da includere in ogni sezione e domande a cui rispondere
    - Elementi E-E-A-T specifici per ogni paragrafo
    - Link interni suggeriti con anchor text naturali
-   - Suggerimenti su presenza di elementi aggiuntivi come immagini, infografiche, fonti, dati
+   - Suggerimenti su presenza di elementi aggiuntivi come immagini, infografiche, fonti, dati, all'interno dei paragrafi dove potrebbe essere utile
 
 6. **LINK INTERNI STRATEGICI**
-   - Elenco dettagliato di link interni da inserire
+   - Elenco dettagliato di link interni da inserire, pertinenti e collegati al contenuto dell'articolo
    - Anchor text naturali e pertinenti
    - Posizionamento strategico nel contenuto
    - Valore aggiunto per l'utente
