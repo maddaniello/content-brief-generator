@@ -1351,4 +1351,4 @@ DATI SEMRUSH KEYWORD PRINCIPALE "{keyword_analysis['main_keyword']}":
         
         # Prepara dati Serper avanzati
         serper_info = ""
-        if
+        if keyword_
