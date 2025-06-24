@@ -265,7 +265,7 @@ class ContentBriefGenerator:
         internal_urls = "\n".join(data['sitemap_urls'][:30]) if data['sitemap_urls'] else data.get('manual_urls', 'Nessuna URL interna disponibile')
         
         prompt = f"""
-Sei un esperto SEO copywriter e content strategist specializzato in E-E-A-T (Experience, Expertise, Authoritativeness, Trustworthiness). Devi creare un content brief dettagliato per un articolo ottimizzato SEO che raggiunga il massimo punteggio E-E-A-T.
+Sei un esperto SEO copywriter e content strategist specializzato in E-E-A-T (Experience, Expertise, Authoritativeness, Trustworthiness). Devi creare un content brief, una scaletta dettagliata per un articolo ottimizzato SEO che raggiunga il massimo punteggio E-E-A-T.
 
 INFORMAZIONI CLIENTE:
 - Brand: {data['brand']}
@@ -335,11 +335,12 @@ Genera un content brief completo che includa:
 5. **STRUTTURA CONTENUTO DETTAGLIATA**
    Per ogni sezione specifica (usa capitalizzazione naturale):
    - H1 principale ottimizzato
-   - H2 e H3 con descrizione dettagliata del contenuto
-   - Parole chiave da includere in ogni sezione
+   - Descrizione di cosa dovrebbe contenere l'introduzione dopo l'H1
+   - H2 e H3 con descrizione dettagliata del contenuto tramite elenchi puntati che spieghino gli argomenti principali da trattare all'interno del paragrafo
+   - Parole chiave utili da includere in ogni sezione e domande a cui rispondere
    - Elementi E-E-A-T specifici per ogni paragrafo
    - Link interni suggeriti con anchor text naturali
-   - Elementi aggiuntivi (immagini, infografiche, fonti, dati)
+   - Suggerimenti su presenza di elementi aggiuntivi come immagini, infografiche, fonti, dati
 
 6. **LINK INTERNI STRATEGICI**
    - Elenco dettagliato di link interni da inserire
